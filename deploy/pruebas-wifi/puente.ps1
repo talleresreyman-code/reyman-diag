@@ -231,23 +231,15 @@ try { $l.Start() } catch {
 
 Write-Host ''
 Write-Host '  Reyman Diag · enlace en marcha (Wi-Fi y J2534)' -ForegroundColor Cyan
-Write-Host "  App: http://localhost:$Puerto  (se abre sola en el navegador) o https://diag.talleresreyman.es"
+Write-Host "  Abre la app Reyman Diag (diag.talleresreyman.es). Sin internet: http://localhost:$Puerto"
 Write-Host '  1. Conecta el portátil a la red Wi-Fi del adaptador (WiFi_OBDII o parecido).'
 Write-Host '  2. En la app, pulsa «Wi-Fi».'
-Write-Host '  3. Interfaz Autel (V200) por USB: en la app, pulsa «MaxiVCI (J2534)».'
+Write-Host '  3. Interfaz Autel por USB: en la app, pulsa «Autel V200 (J2534)» o «Autel VCMI (J2534)».'
 if ($script:j2534Listo) { Write-Host '  J2534: preparado.' -ForegroundColor Green } else { Write-Host ('  J2534: ' + $script:j2534Motivo) -ForegroundColor Yellow }
 Write-Host '  No cierres esta ventana mientras uses la app.'
 Write-Host ''
-# Con internet se abre la app online (con usuario, OT e informes); sin internet (p. ej. conectado al Wi-Fi del adaptador), la de pruebas
-$online = $false
-try { $online = (Invoke-WebRequest -Uri 'https://diag.talleresreyman.es/api/salud' -UseBasicParsing -TimeoutSec 4).StatusCode -eq 200 } catch { }
-if ($online) {
-  Write-Host '  Abriendo la app online: https://diag.talleresreyman.es' -ForegroundColor Green
-  Start-Process 'https://diag.talleresreyman.es/'
-} else {
-  Write-Host '  Sin internet: abriendo la app en modo pruebas (sin guardar en las OT).' -ForegroundColor Yellow
-  Start-Process "http://localhost:$Puerto/"
-}
+# No se abre ninguna página: la app se abre a mano (instalada como aplicación, diag.talleresreyman.es).
+# Si hace falta la versión sin internet (Wi-Fi del adaptador): http://localhost:35001
 
 while ($l.IsListening) {
   try {
