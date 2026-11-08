@@ -1,4 +1,4 @@
-# Reyman Diag · Reyman Connect · estado (08/11/2026, v0.4.3)
+# Reyman Diag · Reyman Connect · estado (08/11/2026, v0.4.4)
 
 Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba disponible: la conexión Wi-Fi se ha rehecho a partir del programa de enlace).
 
@@ -80,6 +80,12 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Datos en vivo J2534 ~4× más rápidos (recuerda cuántas centralitas contestan); aviso si la V200 se desconecta del USB.
 - **Batería de alta tensión Ford** (`marcas/ford.js`): BECM 7E4, DID 4801 carga, 480D tensión, 4840/4841 celdas, DD01 km; recuadro en Vehículo con «En vivo» cada 2 s, registro e informe. Simulador «Ford Kuga 2.5 FHEV».
 - Pendiente: grabación con pines 3/11 (ABS, airbag, cuadro); probar la batería híbrida en el coche real.
+
+### 12. Publicado en el VPS → v0.4.4 (08/11/2026)
+- Repositorio `talleresreyman-code/reyman-diag`; en el VPS en `/opt/reyman-diag` (llave de despliegue `github-diag`), sin puerto propio: el Caddy de n8n lo publica en https://diag.talleresreyman.es (`deploy/publicar-caddy.sh`). Actualizar: `cd /opt/reyman-diag && deploy/actualizar.sh`.
+- App Reyman (commit 8a9e667): cookie de sesión con dominio `.talleresreyman.es`, `?volver=`, permisos `diag.*` (migración 039), pestaña «Diagnosis», `GET /api/diag/ots` con clave `reyman-diag`.
+- La app online usa la V200 y el Wi-Fi si «Iniciar Reyman Diag» está abierto en el portátil (`/estado` del enlace con CORS y red privada). Con internet el enlace abre la app online; sin internet, la de pruebas. Funciona en el portátil de José.
+- Pendiente: piloto en el taller (vLinker Bluetooth en tablet, V200 en portátil), comprobar guardado en OT, correo e informe al cliente, copia de la base `diag` a OneDrive.
 
 ### Pruebas
 - **78 pruebas automáticas.**
