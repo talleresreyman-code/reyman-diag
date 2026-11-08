@@ -14,12 +14,14 @@ import { evaluarTension, medirArranque, detectarSituacion, evaluarAlternador, mu
 import { crearApi } from './lib/api.js';
 import { dibujarLinea, formatear } from './lib/grafica.js';
 import { htmlInforme } from './lib/informe.js';
+import { crearVisor, COLORES } from './lib/visor-grafica.js';
+import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, textoTiempo, aCsv, aJson } from '@reyman/obd-core/visor.js';
 
 // PRUEBAS: paquete para el portátil (programa de enlace Wi-Fi). Adaptador real, sin servidor: nada se guarda en la OT
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.7';
+const VERSION = '0.4.8';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -50,6 +52,7 @@ const estado = {
   vista: 'conectar',
   soloConsulta: false,
   vivo: { grupo: 'basico', hist: {}, sel: null, activo: false, grabando: null, ausentes: new Set(), canales: [], foto: null },
+  grab: { lista: null, filtro: null, modelo: null, visor: null, sel: null, ultima: null },
   registro: [],
   registroCompleto: [], // todo lo enviado y recibido (para descargar)
   lecturasSesion: [], // lecturas y pruebas de esta sesión (para descargar)
@@ -97,6 +100,7 @@ function pintarMarco() {
       <section class="vista" id="v-itv" hidden></section>
       <section class="vista" id="v-vivo" hidden></section>
       <section class="vista" id="v-informe" hidden></section>
+      <section class="vista" id="v-grabaciones" hidden></section>
     </main>
     <nav class="pestanas" aria-label="Secciones">
       ${[['vehiculo', 'Vehículo', I.coche], ['averias', 'Averías', I.averia], ['itv', 'Pre-ITV', I.itv], ['vivo', 'En vivo', I.vivo], ['informe', 'Informe', I.informe]]
@@ -115,7 +119,7 @@ function ir(vista) {
     if (b.dataset.ir === 'vivo' && !estado.conectado) b.disabled = true;
   });
   estado.vivo.activo = vista === 'vivo';
-  ({ conectar: vConectar, vehiculo: vVehiculo, averias: vAverias, itv: vItv, vivo: vVivo, informe: vInforme })[vista]();
+  ({ conectar: vConectar, vehiculo: vVehiculo, averias: vAverias, itv: vItv, vivo: vVivo, informe: vInforme, grabaciones: vGrabaciones })[vista]();
   window.scrollTo({ top: 0 });
   if (estado.vivo.activo) bucleVivo();
 }
@@ -144,6 +148,7 @@ function vConectar() {
       <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Otra interfaz Autel (VCMI…)</strong><span>${conPuente() ? `VCMI u otra interfaz J2534 instalada en el portátil.${otraJ2534() ? ` Última: ${esc(otraJ2534())}.` : ''}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="sim">${I.sim}<strong>Simulador</strong><span>Coche de prueba para aprender a usar la app sin adaptador.</span></button>
       <button class="opcion" data-con="consulta">${I.carpeta}<strong>Consultar lecturas guardadas</strong><span>Sin conectar al coche, por matrícula. Para la oficina.</span></button>
+      <button class="opcion" data-con="grabaciones">${I.vivo}<strong>Ver datos grabados</strong><span>Pruebas de carretera guardadas o un archivo CSV/JSON (grabador, otros equipos). Sin conectar.</span></button>
     </div>
     <details class="peq" style="margin-top:16px" ${PRUEBAS ? 'open' : ''}><summary>Registro de comunicación</summary><div class="registro" id="registro">${esc(estado.registro.slice(-60).join('\n'))}</div>
       <div class="fila-btn"><button class="btn fantasma" id="reg-descargar">Descargar registro</button>${PRUEBAS ? `<span class="peq suave">${estado.lecturasSesion.length} lecturas y pruebas en esta sesión</span>` : ''}</div></details>
@@ -152,6 +157,7 @@ function vConectar() {
   pintarVersion();
   el.querySelectorAll('[data-con]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.con === 'consulta') return dialogoConsulta();
+    if (b.dataset.con === 'grabaciones') return ir('grabaciones');
     if (b.dataset.con === 'sim') return dialogoSimulador();
     if (b.dataset.con === 'wifi') return dialogoWifi();
     if (b.dataset.con === 'j2534') return conectar('j2534', 'V200');
@@ -1015,13 +1021,22 @@ function vVivo() {
     <div class="grupos" role="group" aria-label="Grupo de datos">${grupos.map((x) => `<button data-g="${x.id}" aria-pressed="${x.id === estado.vivo.grupo}">${esc(x.nombre)} <span class="suave">${x.canales.length}</span></button>`).join('')}</div>
     <div class="indicadores">${estado.vivo.canales.map((c) => `<button class="indicador" data-c="${esc(c.clave)}" aria-pressed="${c.clave === estado.vivo.sel}"><div class="nombre">${esc(c.nombre)}</div><div><span class="valor" id="val-${idCanal(c.clave)}">—</span><span class="unidad">${esc(c.unidad)}</span></div><canvas id="spk-${idCanal(c.clave)}" aria-hidden="true"></canvas></button>`).join('')}</div>
     <div class="panel"><h3 id="sel-nombre">${esc(selC?.nombre || '')}</h3><canvas class="grafica-grande" id="grafica"></canvas></div>
-    <div class="fila-btn">${rec ? `<span class="grabando">Grabando · <span id="rec-t">0</span> s</span><button class="btn" id="rec-parar">Parar y guardar en la OT</button>` : '<button class="btn sec" id="rec-ini">Grabar sesión (prueba de carretera)</button>'}
-      <button class="btn sec" id="foto-ini">Foto de todos los datos</button></div>
+    <div class="fila-btn">${rec ? `<span class="grabando">Grabando · <span id="rec-t">0</span> s</span><button class="btn sec" id="rec-marca">Marcar momento (${rec.eventos.length})</button><button class="btn" id="rec-parar">Parar y guardar en la OT</button>` : '<button class="btn sec" id="rec-ini">Grabar sesión (prueba de carretera)</button>'}
+      <button class="btn sec" id="foto-ini">Foto de todos los datos</button><button class="btn fantasma" id="ver-grab">Ver datos grabados</button></div>
+    ${rec ? '<p class="peq suave">«Marcar momento» deja una señal en la grabación (un ruido, un tirón, el testigo): luego se ve en el visor.</p>' : ''}
     <p class="peq suave">Este grupo pide ${npids} dato${npids === 1 ? '' : 's'} al coche en cada vuelta: cuantos menos, más rápido se refresca. Solo salen los datos que el coche dice que tiene.</p>
     <div id="foto"></div>`;
   el.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { estado.vivo.grupo = b.dataset.g; vVivo(); });
   el.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => { estado.vivo.sel = b.dataset.c; vVivo(); });
-  $('#rec-ini', el)?.addEventListener('click', () => { estado.vivo.grabando = { inicio: Date.now(), canales: estado.vivo.canales.slice(), muestras: [] }; vVivo(); });
+  $('#rec-ini', el)?.addEventListener('click', () => { estado.vivo.grabando = { inicio: Date.now(), canales: estado.vivo.canales.slice(), muestras: [], eventos: [] }; vVivo(); });
+  $('#rec-marca', el)?.addEventListener('click', (e) => {
+    const g = estado.vivo.grabando;
+    if (!g) return;
+    g.eventos.push({ t: Date.now() - g.inicio, tipo: 'marca', detalle: `Marca ${g.eventos.length + 1}` });
+    e.currentTarget.textContent = `Marcar momento (${g.eventos.length})`;
+    toast(`Marca ${g.eventos.length} a los ${Math.round((Date.now() - g.inicio) / 1000)} s.`);
+  });
+  $('#ver-grab', el)?.addEventListener('click', () => ir('grabaciones'));
   $('#rec-parar', el)?.addEventListener('click', pararGrabacion);
   $('#foto-ini', el)?.addEventListener('click', fotoDatos);
   if (estado.vivo.foto) pintarFoto();
@@ -1127,13 +1142,188 @@ async function pararGrabacion() {
     const r = await api.guardarSesion({
       lectura_id: estado.lecturaId, ot: estado.ot?.ot || null, matricula: estado.ot?.matricula || null, vin: estado.lectura.vehiculo?.vin,
       inicio: new Date(g.inicio).toISOString(), duracion_s: Math.round((Date.now() - g.inicio) / 1000),
-      pids: g.canales.map((c) => ({ pid: c.clave, nombre: c.nombre, unidad: c.unidad })), muestras: g.muestras,
+      pids: g.canales.map((c) => ({ pid: c.clave, nombre: c.nombre, unidad: c.unidad })), muestras: g.muestras, eventos: g.eventos || [],
     });
+    estado.grab.ultima = r.id || null;
+    estado.grab.lista = null;
     toast(`Sesión guardada (${g.muestras.length} muestras)${r.destino ? `: ${r.destino}` : ''}.`);
   } catch (e) {
     toast(`No se pudo guardar la sesión: ${e.message}`);
   }
   if (estado.vista === 'vivo') vVivo();
+}
+
+// ---------------------------------------------------------------------------
+// Visor de datos grabados (pruebas de carretera, grabador, CSV de otros equipos)
+// ---------------------------------------------------------------------------
+function vGrabaciones() {
+  const g = estado.grab;
+  if (g.modelo) return pintarGrabacion();
+  const el = $('#v-grabaciones');
+  if (g.filtro === null) g.filtro = estado.ot?.matricula || '';
+  el.innerHTML = `<button class="enlace gr-atras" id="gr-volver">← ${estado.conectado ? 'En vivo' : estado.lectura ? 'Volver' : 'Conectar'}</button>
+    <h1>Datos grabados</h1>
+    <p class="suave">Pruebas de carretera guardadas desde «En vivo», o un archivo del grabador o de otro equipo (CSV o JSON).</p>
+    <div class="panel">
+      <div class="gr-buscar">
+        <div class="campo" style="flex:1;margin:0"><label for="gr-mat">Matrícula u OT</label><input id="gr-mat" autocapitalize="characters" autocomplete="off" placeholder="Vacío: las últimas" value="${esc(g.filtro)}"></div>
+        <button class="btn" id="gr-buscar">Buscar</button>
+        <label class="btn sec gr-archivo">Abrir archivo<input type="file" id="gr-archivo" accept=".csv,.json,.txt,text/csv,application/json" hidden></label>
+      </div>
+      <div id="gr-lista" style="margin-top:12px"></div>
+    </div>`;
+  $('#gr-volver', el).onclick = () => ir(estado.conectado ? 'vivo' : estado.lectura ? 'vehiculo' : 'conectar');
+  const buscar = () => { g.filtro = $('#gr-mat', el).value.trim(); g.lista = null; cargarListaGrab(); };
+  $('#gr-buscar', el).onclick = buscar;
+  $('#gr-mat', el).onkeydown = (e) => { if (e.key === 'Enter') buscar(); };
+  $('#gr-archivo', el).onchange = async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 60 * 1024 * 1024) return toast('El archivo es demasiado grande (más de 60 MB).');
+    try {
+      const m = abrirTexto(await f.text(), f.name);
+      abrirModelo(m);
+    } catch (err) { toast(`No se puede abrir «${f.name}»: ${err.message}`); }
+    e.target.value = '';
+  };
+  cargarListaGrab();
+}
+
+async function cargarListaGrab() {
+  const g = estado.grab;
+  const caja = $('#gr-lista');
+  if (!caja) return;
+  if (!g.lista) {
+    caja.innerHTML = '<div class="progreso"><span class="giro"></span>Buscando…</div>';
+    const f = g.filtro.replace(/[\s-]/g, '').toUpperCase();
+    try {
+      g.lista = (await api.listarSesiones(/^\d{5,7}$/.test(f) ? { ot: f } : { matricula: f })).sesiones || [];
+    } catch (e) { caja.innerHTML = `<div class="aviso error">${esc(e.message)}</div>`; return; }
+  }
+  if (!$('#gr-lista')) return;
+  if (!g.lista.length) { caja.innerHTML = `<p class="suave">${g.filtro ? 'No hay grabaciones de ese coche.' : 'Todavía no hay grabaciones guardadas.'}</p>`; return; }
+  caja.innerHTML = `<ul class="gr-lista">${g.lista.map((x, i) => `<li class="gr-item${x.id === g.ultima ? ' gr-nueva' : ''}">
+      <div class="gr-item-cab"><strong>${esc(x.matricula || '—')}</strong><span class="suave">OT ${esc(x.ot || '—')}</span>
+        <span class="suave">${esc(new Date(x.creada || x.inicio).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }))}${x.usuario ? ` · ${esc(x.usuario)}` : ''}</span></div>
+      <div class="peq">${textoTiempo((x.duracion_s || 0) * 1000, { decimas: false })} · ${x.num_muestras || 0} muestras · ${esc((x.datos || []).slice(0, 4).join(', '))}${(x.datos || []).length > 4 ? ` y ${x.datos.length - 4} más` : ''}</div>
+      ${x.con_datos === false ? '<span class="peq suave">Solo en OneDrive</span>' : `<button class="btn sec" data-gr="${i}">Ver</button>`}
+    </li>`).join('')}</ul>`;
+  caja.querySelectorAll('[data-gr]').forEach((b) => b.onclick = async () => {
+    const x = g.lista[Number(b.dataset.gr)];
+    b.disabled = true; b.textContent = 'Abriendo…';
+    try { abrirModelo(desdeSesion(await api.obtenerSesion(x.id))); } catch (e) { toast(e.message); b.disabled = false; b.textContent = 'Ver'; }
+  });
+}
+
+function abrirModelo(m) {
+  if (!m.canales.length || m.t.length < 2) return toast('La grabación no tiene datos suficientes para verla.');
+  estado.grab.modelo = m;
+  estado.grab.sel = null;
+  if (estado.vista !== 'grabaciones') ir('grabaciones'); else pintarGrabacion();
+}
+
+function pintarGrabacion() {
+  const g = estado.grab;
+  const m = g.modelo;
+  const el = $('#v-grabaciones');
+  g.visor?.destruir();
+  // Por defecto: los cuatro primeros datos (o los que más se mueven si hay muchos)
+  if (!g.sel) {
+    const variacion = (c) => { const e = estadisticas(m, c.clave); return e.n ? (e.max - e.min) / (Math.abs(e.media) + 1) : 0; };
+    g.sel = (m.canales.length <= 4 ? m.canales : m.canales.slice().sort((a, b) => variacion(b) - variacion(a)).slice(0, 4).sort((a, b) => m.canales.indexOf(a) - m.canales.indexOf(b))).map((c) => c.clave);
+  }
+  const fecha = m.inicio ? new Date(m.inicio).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  el.innerHTML = `<button class="enlace gr-atras" id="gr-cerrar">← Grabaciones</button>
+    <h1>${esc(m.titulo || 'Grabación')}</h1>
+    <p class="suave">${[fecha, m.origen, `${textoTiempo(duracion(m), { decimas: false })}`, `${m.canales.length} datos`, `${frecuencia(m).toLocaleString('es-ES')} muestras/s`, m.vehiculo?.vin].filter(Boolean).map(esc).join(' · ')}</p>
+    <div class="gr-canales" role="group" aria-label="Datos que se ven">${m.canales.map((c) => `<button type="button" class="gr-chip" data-c="${esc(c.clave)}" aria-pressed="${g.sel.includes(c.clave)}">${esc(c.nombre)}${c.unidad ? ` <span class="suave">${esc(c.unidad)}</span>` : ''}</button>`).join('')}</div>
+    <p class="peq suave" style="margin:4px 0 0">Toca un dato para verlo u ocultarlo (hasta 8 a la vez).</p>
+    <div class="panel gr-panel"><div id="gr-visor"></div></div>
+    ${m.eventos.length ? `<div class="panel"><h3>Marcas</h3><div class="gr-marcas">${m.eventos.map((e, i) => `<button class="btn fantasma" data-ev="${i}">${esc(e.detalle || e.tipo)} · ${textoTiempo(e.t)}</button>`).join('')}</div></div>` : ''}
+    <div class="panel"><h3>Valores <span class="peq suave" id="gr-rango"></span></h3><div class="tabla-scroll"><table class="m06" id="gr-stats"></table></div>
+      <p class="peq suave">Toca un mínimo o un máximo para ir a ese instante.</p></div>
+    <div class="fila-btn">
+      <button class="btn sec" id="gr-marcar">Añadir marca en el cursor</button>
+      <button class="btn sec" id="gr-csv-ver">Descargar lo que se ve (CSV)</button>
+      <button class="btn sec" id="gr-csv">Descargar todo (CSV)</button>
+      <button class="btn fantasma" id="gr-json">Guardar para el visor (JSON)</button>
+    </div>`;
+  $('#gr-cerrar', el).onclick = () => { g.visor?.destruir(); g.visor = null; g.modelo = null; vGrabaciones(); };
+  g.visor = crearVisor($('#gr-visor', el), m, { seleccion: g.sel, alCambiar: pintarStatsGrab });
+  el.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => {
+    const k = b.dataset.c;
+    if (g.sel.includes(k)) g.sel = g.sel.filter((x) => x !== k);
+    else if (g.sel.length >= 8) return toast('Como mucho 8 datos a la vez: quita alguno.');
+    else g.sel = m.canales.map((c) => c.clave).filter((x) => x === k || g.sel.includes(x));
+    b.setAttribute('aria-pressed', String(g.sel.includes(k)));
+    pintarChips();
+    g.visor.fijarSeleccion(g.sel);
+  });
+  el.querySelectorAll('[data-ev]').forEach((b) => b.onclick = () => {
+    const e = m.eventos[Number(b.dataset.ev)];
+    const v = g.visor.ventana();
+    const ancho = Math.min(v.t1 - v.t0, 30000);
+    g.visor.irA(e.t - ancho / 2, e.t + ancho / 2);
+  });
+  $('#gr-marcar', el).onclick = () => {
+    const t = g.visor.cursor();
+    if (t === null) return toast('Pon primero el cursor en la gráfica (pasa el ratón o toca).');
+    const nota = window.prompt('Texto de la marca', `Marca ${m.eventos.length + 1}`);
+    if (nota === null) return;
+    m.eventos.push({ t, tipo: 'marca', detalle: nota.trim() || `Marca ${m.eventos.length + 1}` });
+    m.eventos.sort((a, b) => a.t - b.t);
+    pintarGrabacion();
+    toast('Marca añadida. Se guarda al descargar el CSV o el JSON.');
+  };
+  const nombreArchivo = (ext) => `grabacion-${(m.vehiculo?.matricula || m.titulo || 'reyman').replace(/[^\w-]+/g, '_')}-${(m.inicio || new Date().toISOString()).slice(0, 16).replace(/[:T]/g, '-')}.${ext}`;
+  $('#gr-csv-ver', el).onclick = () => { const v = g.visor.ventana(); descargarTexto(aCsv(m, { ...v, claves: g.sel }), nombreArchivo('csv'), 'text/csv'); };
+  $('#gr-csv', el).onclick = () => descargarTexto(aCsv(m), nombreArchivo('csv'), 'text/csv');
+  $('#gr-json', el).onclick = () => descargarTexto(aJson(m), nombreArchivo('json'), 'application/json');
+  pintarChips();
+}
+
+const colorGrab = (k) => COLORES[Math.max(0, estado.grab.modelo?.canales.findIndex((c) => c.clave === k) ?? 0) % COLORES.length];
+
+function pintarChips() {
+  const g = estado.grab;
+  document.querySelectorAll('#v-grabaciones .gr-chip').forEach((b) => {
+    const on = g.sel.includes(b.dataset.c);
+    b.style.borderColor = on ? colorGrab(b.dataset.c) : '';
+    b.style.boxShadow = on ? `inset 4px 0 0 ${colorGrab(b.dataset.c)}` : '';
+  });
+}
+
+function pintarStatsGrab({ t0, t1, cursor, sel }) {
+  const m = estado.grab.modelo;
+  const tabla = $('#gr-stats');
+  if (!m || !tabla) return;
+  const r = $('#gr-rango');
+  if (r) r.textContent = `de ${textoTiempo(t0)} a ${textoTiempo(t1)}`;
+  const filas = sel.map((k) => {
+    const c = m.canales.find((x) => x.clave === k);
+    const e = estadisticas(m, k, t0, t1);
+    const u = esc(c.unidad || '');
+    const ir = (t, v) => (t === null ? '—' : `<button class="enlace" data-ir-t="${t}">${formatear(v)} ${u}</button>`);
+    return `<tr><td><span class="gr-muestra" style="background:${colorGrab(k)}"></span>${esc(c.nombre)}</td>
+      <td class="num">${cursor !== null ? `${formatear(valorEn(m, k, cursor))} ${u}` : '—'}</td>
+      <td class="num">${ir(e.tMin, e.min)}</td><td class="num">${ir(e.tMax, e.max)}</td><td class="num">${e.n ? `${formatear(e.media)} ${u}` : '—'}</td></tr>`;
+  }).join('');
+  tabla.innerHTML = `<thead><tr><th>Dato</th><th>En el cursor${cursor !== null ? ` (${textoTiempo(cursor)})` : ''}</th><th>Mínimo</th><th>Máximo</th><th>Media</th></tr></thead><tbody>${filas}</tbody>`;
+  tabla.querySelectorAll('[data-ir-t]').forEach((b) => b.onclick = () => {
+    const t = Number(b.dataset.irT);
+    const v = estado.grab.visor.ventana();
+    const ancho = Math.min(v.t1 - v.t0, 20000);
+    estado.grab.visor.irA(t - ancho / 2, t + ancho / 2);
+  });
+}
+
+function descargarTexto(texto, nombre, tipo) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([texto], { type: `${tipo};charset=utf-8` }));
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
 
 // ---------------------------------------------------------------------------

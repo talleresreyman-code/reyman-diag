@@ -85,6 +85,16 @@ test('sesiones: guardar y n8n las recoge en CSV con clave', async () => {
   assert.equal(m.statusCode, 200);
   const otra = await app.inject({ url: '/api/ingest/sesiones', headers: { 'x-api-key': 'k' } });
   assert.equal(otra.json().sesiones.length, 0);
+  // Visor: sigue en la base después de copiarla a OneDrive
+  const lista = await app.inject({ url: '/api/sesiones?matricula=4521 KLM', headers: H('mecanico') });
+  assert.equal(lista.statusCode, 200);
+  const fila = lista.json().sesiones[0];
+  assert.equal(fila.id, ses.id);
+  assert.deepEqual(fila.datos, ['Régimen motor']);
+  assert.equal(fila.muestras, undefined);
+  const una = await app.inject({ url: `/api/sesiones/${ses.id}`, headers: H('mecanico') });
+  assert.equal(una.json().muestras.length, 2);
+  assert.equal((await app.inject({ url: '/api/sesiones/no-existe', headers: H('mecanico') })).statusCode, 404);
 });
 
 test('enviar informe sin n8n configurado devuelve error sin romper', async () => {

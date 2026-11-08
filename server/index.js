@@ -244,9 +244,24 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     const r = await store.crearSesion(req.s.tenant, {
       lectura_id: b.lectura_id || null, ot: b.ot || null, matricula: limpiarMat(b.matricula), vin: b.vin || null, usuario: req.s.usuario.nombre,
       inicio: b.inicio || new Date().toISOString(), duracion_s: Number(b.duracion_s) || 0, pids: b.pids, muestras: b.muestras.slice(0, 20000),
+      eventos: Array.isArray(b.eventos) ? b.eventos.slice(0, 500).map((e) => ({ t: Number(e.t) || 0, tipo: String(e.tipo || 'marca').slice(0, 20), detalle: e.detalle ? String(e.detalle).slice(0, 200) : null })) : [],
     });
     const año = new Date().getFullYear();
     return { id: r.id, destino: `OneDrive: DIAGNOSIS OBD/${año}/${b.ot || 'SIN OT'} ${limpiarMat(b.matricula) || ''} (esta noche)` };
+  });
+
+  // --- visor de grabaciones ---
+  app.get('/api/sesiones', { preHandler: exigir('diag.ver') }, async (req) => {
+    const { matricula, ot, vin } = req.query;
+    const filas = await store.listarSesiones(req.s.tenant, { matricula: limpiarMat(matricula) || null, ot: ot || null, vin: vin || null, limite: Math.min(Number(req.query.limite) || 50, 200) });
+    return { sesiones: filas.map(({ pids, ...s }) => ({ ...s, datos: (pids || []).map((p) => p.nombre).slice(0, 12) })) };
+  });
+  app.get('/api/sesiones/:id', { preHandler: exigir('diag.ver') }, async (req, rep) => {
+    const s = await store.obtenerSesion(req.s.tenant, req.params.id);
+    if (!s) return rep.code(404).send({ error: 'Grabación no encontrada.' });
+    if (!s.muestras) return rep.code(410).send({ error: `Esta grabación solo está en OneDrive${s.onedrive ? ` (${s.onedrive})` : ''}. Descárgala de allí y ábrela con «Abrir archivo».` });
+    const { tenant_id: _t, ...resto } = s;
+    return resto;
   });
 
   // --- informe al cliente ---

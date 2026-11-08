@@ -30,6 +30,8 @@ function apiReal() {
     pedirBorrado: (b) => pedir('POST', '/api/borrados', b),
     resultadoBorrado: (id, r) => pedir('PATCH', `/api/borrados/${id}`, r),
     guardarSesion: (s) => pedir('POST', '/api/sesiones', s),
+    listarSesiones: (q = {}) => pedir('GET', `/api/sesiones?${new URLSearchParams(Object.entries(q).filter(([, v]) => v))}`),
+    obtenerSesion: (id) => pedir('GET', `/api/sesiones/${encodeURIComponent(id)}`),
     enviarInforme: (d) => pedir('POST', '/api/informes/enviar', d),
     diagnosticoIa: (d) => pedir('POST', '/api/ia/diagnostico', d),
     urlInforme: (id) => `/api/lecturas/${id}/informe.pdf`,
@@ -38,7 +40,7 @@ function apiReal() {
 
 function apiDemo() {
   const espera = (ms = 250) => new Promise((r) => setTimeout(r, ms));
-  const mem = { lecturas: [], borrados: [], sesiones: [], iaGastado: 1.84 };
+  const mem = { lecturas: [], borrados: [], sesiones: [sesionDemo()], iaGastado: 1.84 };
   const OTS = [
     { ot: '261402', matricula: '4521KLM', vin: 'WVWZZZAUZHW512345', cliente: 'Cliente de ejemplo 1', vehiculo: 'Volkswagen Golf 2.0 TDI', situacion: 'En taller', mecanico: 'Bryhan' },
     { ot: '261415', matricula: '7788LKD', vin: 'VSSZZZKLZMR024680', cliente: 'Cliente de ejemplo 2', vehiculo: 'SEAT León 1.5 TSI', situacion: 'Pendiente de diagnosis', mecanico: 'Alex' },
@@ -65,7 +67,14 @@ function apiDemo() {
     async historial(matricula) { await espera(); return { lecturas: mem.lecturas.filter((l) => l.matricula === matricula) }; },
     async pedirBorrado(b) { await espera(); const r = { ...b, id: id(), permitido: true }; mem.borrados.push(r); return r; },
     async resultadoBorrado(i, r) { await espera(100); Object.assign(mem.borrados.find((b) => b.id === i) || {}, r); return { ok: true }; },
-    async guardarSesion(s) { await espera(); mem.sesiones.push(s); return { id: id(), destino: `OneDrive · DIAGNOSIS OBD/${new Date().getFullYear()}/${s.ot || 'sin OT'} ${s.matricula || ''}` }; },
+    async listarSesiones({ matricula, ot } = {}) {
+      await espera(150);
+      const q = (matricula || '').replace(/[\s-]/g, '').toUpperCase();
+      const lista = mem.sesiones.filter((s) => (!q || s.matricula === q) && (!ot || s.ot === ot));
+      return { sesiones: lista.map(({ muestras, pids, ...x }) => ({ ...x, num_muestras: muestras.length, datos: pids.map((p) => p.nombre), con_datos: true })) };
+    },
+    async obtenerSesion(i) { await espera(150); const s = mem.sesiones.find((x) => x.id === i); if (!s) throw new Error('Grabación no encontrada.'); return s; },
+    async guardarSesion(s) { await espera(); const nuevo = id(); mem.sesiones.unshift({ ...s, id: nuevo, usuario: 'Mecánico (demo)', num_muestras: s.muestras.length, creada: new Date().toISOString() }); return { id: nuevo, destino: `OneDrive · DIAGNOSIS OBD/${new Date().getFullYear()}/${s.ot || 'sin OT'} ${s.matricula || ''}` }; },
     async enviarInforme(d) { await espera(600); return { ok: true, enviadoA: d.email, desde: 'talleresreyman@gmail.com', demo: true }; },
     async diagnosticoIa({ lectura }) {
       await espera(1200);
@@ -97,4 +106,33 @@ function diagnosticoDemo(l) {
     partes.push('', 'Revisa el freeze frame para ver en qué condiciones apareció cada avería y sigue el flujo de diagnóstico del taller.');
   }
   return partes.join('\n');
+}
+
+// Prueba de carretera de ejemplo para el visor (modo demostración): 3 minutos a 5 muestras por segundo,
+// con un tirón a los 95 s (cae la presión de turbo y sube el régimen sin ganar velocidad).
+function sesionDemo() {
+  const pids = [
+    { pid: '0C.RPM', nombre: 'Régimen del motor', unidad: 'rpm' }, { pid: '0D.VSS', nombre: 'Velocidad', unidad: 'km/h' },
+    { pid: '70.BP_A_CMD', nombre: 'Presión de turbo ordenada A', unidad: 'kPa' }, { pid: '70.BP_A_ACT', nombre: 'Presión de turbo A', unidad: 'kPa' },
+    { pid: '10.MAF', nombre: 'Caudal de aire (caudalímetro)', unidad: 'g/s' }, { pid: '05.ECT', nombre: 'Temperatura del refrigerante', unidad: '°C' },
+    { pid: '42.VPWR', nombre: 'Tensión de la centralita', unidad: 'V' },
+  ];
+  const muestras = [];
+  for (let t = 0; t <= 180000; t += 200) {
+    const s = t / 1000;
+    const acel = Math.max(0, Math.sin(s / 14)) ** 1.5;
+    const tiron = s > 94 && s < 99 ? 1 : 0;
+    const rpm = 850 + 2600 * acel + (tiron ? 500 * Math.sin(s * 9) : 0) + 20 * Math.sin(s * 3);
+    const ordenada = 100 + 120 * acel;
+    muestras.push({ t, v: {
+      '0C.RPM': Math.round(rpm), '0D.VSS': Math.round(Math.min(120, s * 0.4 + 60 * acel)),
+      '70.BP_A_CMD': Math.round(ordenada), '70.BP_A_ACT': Math.round(tiron ? 105 : ordenada - 3 + 2 * Math.sin(s * 2)),
+      '10.MAF': Math.round((8 + 90 * acel * (tiron ? 0.5 : 1)) * 10) / 10, '05.ECT': Math.round(Math.min(90, 62 + s * 0.2)),
+      '42.VPWR': Math.round((14.1 + 0.05 * Math.sin(s)) * 100) / 100,
+    } });
+  }
+  return {
+    id: 'demo-sesion-1', ot: '261402', matricula: '4521KLM', vin: 'WVWZZZAUZHW512345', usuario: 'Bryhan', inicio: new Date(Date.now() - 86400000).toISOString(),
+    duracion_s: 180, creada: new Date(Date.now() - 86400000).toISOString(), pids, muestras, eventos: [{ t: 95000, tipo: 'marca', detalle: 'Tirón al acelerar' }],
+  };
 }

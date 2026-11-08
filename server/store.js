@@ -87,18 +87,31 @@ async function storePg({ url }) {
     },
     async crearSesion(t, d) {
       const { rows } = await q(
-        `INSERT INTO diag_sesiones (tenant_id, lectura_id, ot, matricula, vin, usuario, inicio, duracion_s, pids, muestras, num_muestras)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-        [t, d.lectura_id, d.ot, d.matricula, d.vin, d.usuario, d.inicio, d.duracion_s, JSON.stringify(d.pids), JSON.stringify(d.muestras), d.muestras.length],
+        `INSERT INTO diag_sesiones (tenant_id, lectura_id, ot, matricula, vin, usuario, inicio, duracion_s, pids, muestras, num_muestras, eventos)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id`,
+        [t, d.lectura_id, d.ot, d.matricula, d.vin, d.usuario, d.inicio, d.duracion_s, JSON.stringify(d.pids), JSON.stringify(d.muestras), d.muestras.length, JSON.stringify(d.eventos || [])],
       );
       return rows[0];
+    },
+    async listarSesiones(t, { matricula, ot, vin, limite = 50 } = {}) {
+      const { rows } = await q(
+        `SELECT id, ot, matricula, vin, usuario, inicio, duracion_s, num_muestras, pids, onedrive, creada, (muestras IS NOT NULL) AS con_datos
+           FROM diag_sesiones WHERE tenant_id = $1 AND ($2::text IS NULL OR matricula = $2) AND ($3::text IS NULL OR ot = $3) AND ($4::text IS NULL OR vin = $4)
+          ORDER BY creada DESC LIMIT $5`,
+        [t, matricula || null, ot || null, vin || null, limite],
+      );
+      return rows;
+    },
+    async obtenerSesion(t, id) {
+      const { rows } = await q('SELECT * FROM diag_sesiones WHERE tenant_id = $1 AND id = $2', [t, id]);
+      return rows[0] || null;
     },
     async sesionesPendientes(t, limite = 20) {
       const { rows } = await q('SELECT * FROM diag_sesiones WHERE tenant_id = $1 AND subida_en IS NULL ORDER BY creada LIMIT $2', [t, limite]);
       return rows;
     },
     async marcarSesionSubida(t, id, destino) {
-      const { rowCount } = await q('UPDATE diag_sesiones SET subida_en = now(), onedrive = $3, muestras = NULL WHERE tenant_id = $1 AND id = $2', [t, id, destino]);
+      const { rowCount } = await q('UPDATE diag_sesiones SET subida_en = now(), onedrive = $3 WHERE tenant_id = $1 AND id = $2', [t, id, destino]);
       return rowCount > 0;
     },
     async gastoIaMes(t) {
@@ -162,7 +175,13 @@ function storeMemoria() {
     async listarBorrados(t) { return de(t, db.borrados).slice().reverse(); },
     async crearSesion(t, d) { const r = { id: id(), tenant_id: t, ...d, num_muestras: d.muestras.length, subida_en: null, creada: new Date() }; db.sesiones.push(r); return { id: r.id }; },
     async sesionesPendientes(t) { return de(t, db.sesiones).filter((s) => !s.subida_en); },
-    async marcarSesionSubida(t, i, destino) { const s = de(t, db.sesiones).find((x) => x.id === i); if (!s) return false; s.subida_en = new Date(); s.onedrive = destino; s.muestras = null; return true; },
+    async marcarSesionSubida(t, i, destino) { const s = de(t, db.sesiones).find((x) => x.id === i); if (!s) return false; s.subida_en = new Date(); s.onedrive = destino; return true; },
+    async listarSesiones(t, { matricula, ot, vin, limite = 50 } = {}) {
+      return de(t, db.sesiones).filter((s) => (!matricula || s.matricula === matricula) && (!ot || s.ot === ot) && (!vin || s.vin === vin))
+        .sort((a, b) => b.creada - a.creada).slice(0, limite)
+        .map(({ muestras, tenant_id: _t, ...s }) => ({ ...s, con_datos: !!muestras }));
+    },
+    async obtenerSesion(t, i) { return de(t, db.sesiones).find((s) => s.id === i) || null; },
     async gastoIaMes(t) {
       const ini = new Date(); ini.setDate(1); ini.setHours(0, 0, 0, 0);
       return de(t, db.ia).filter((x) => x.creada >= ini).reduce((s, x) => s + x.coste_eur, 0);

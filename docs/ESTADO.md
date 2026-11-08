@@ -96,8 +96,15 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - **OBD sobre UDS (SAE J1979-2)**: si el coche no contesta al 01 00, se prueba 22 F400 y se usa 22 F4xx (PID), 22 F8xx (infotipos), 19 42 33 (confirmadas/pendientes, con FTB), 19 55 33 (permanentes) y 14 FF FF 33 (borrar). Aún no: freeze frame (19 04) y modo 06 (22 F6xx). Simulador con `obdUds: true`.
 - Pendiente: probar la foto completa y el servicio 09 en el Kuga real y en un diésel con DPF/AdBlue.
 
+### 14. Visor de datos grabados → v0.4.8 (08/11/2026)
+- Nueva pantalla **«Datos grabados»** (desde Conectar, sin coche, o desde «En vivo»): lista de pruebas de carretera guardadas por matrícula u OT (`GET /api/sesiones`, `GET /api/sesiones/:id`) y **«Abrir archivo»** CSV/JSON: grabador propio (`reyman-grabacion`), CSV del servidor, CSV de Excel (coma decimal) o de otros equipos (columna de tiempo en s, ms o hh:mm:ss y columnas «Nombre (unidad)»).
+- Gráfica (`apps/taller/lib/visor-grafica.js`, modelo en `packages/obd-core/src/visor.js`): una pista por dato con el mismo eje de tiempo, hasta 8 a la vez; cursor con todos los valores; zoom con rueda, arrastrando una zona, botones o dos dedos; mapa de toda la grabación; agrupa por píxel guardando mín./máx. (no se pierden picos).
+- Tabla de valores del tramo visible (en el cursor, mínimo, máximo, media; tocar mín./máx. lleva a ese instante). Marcas: botón **«Marcar momento»** mientras se graba en «En vivo» y «Añadir marca en el cursor» en el visor. Descargar CSV (lo visible o todo) y JSON del visor.
+- Las sesiones **se quedan en la base** aunque n8n las copie a OneDrive (antes se vaciaban). Migración `003_sesiones_visor.sql` (columna `eventos`). Las antiguas ya vaciadas salen como «Solo en OneDrive».
+- Modo demostración con una prueba de carretera de ejemplo (tirón a 1:35).
+
 ### Pruebas
-- **91 pruebas automáticas.**
+- **97 pruebas automáticas.**
 
 ## Pendiente
 
