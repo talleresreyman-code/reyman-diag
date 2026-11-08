@@ -226,7 +226,16 @@ Write-Host '  3. Interfaz Autel (V200) por USB: en la app, pulsa «MaxiVCI (J253
 if ($script:j2534Listo) { Write-Host '  J2534: preparado.' -ForegroundColor Green } else { Write-Host ('  J2534: ' + $script:j2534Motivo) -ForegroundColor Yellow }
 Write-Host '  No cierres esta ventana mientras uses la app.'
 Write-Host ''
-Start-Process "http://localhost:$Puerto/"
+# Con internet se abre la app online (con usuario, OT e informes); sin internet (p. ej. conectado al Wi-Fi del adaptador), la de pruebas
+$online = $false
+try { $online = (Invoke-WebRequest -Uri 'https://diag.talleresreyman.es/api/salud' -UseBasicParsing -TimeoutSec 4).StatusCode -eq 200 } catch { }
+if ($online) {
+  Write-Host '  Abriendo la app online: https://diag.talleresreyman.es' -ForegroundColor Green
+  Start-Process 'https://diag.talleresreyman.es/'
+} else {
+  Write-Host '  Sin internet: abriendo la app en modo pruebas (sin guardar en las OT).' -ForegroundColor Yellow
+  Start-Process "http://localhost:$Puerto/"
+}
 
 while ($l.IsListening) {
   try {
