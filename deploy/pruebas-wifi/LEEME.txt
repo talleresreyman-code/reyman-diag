@@ -1,4 +1,4 @@
-﻿REYMAN DIAG v0.4.5 - PRUEBAS EN EL PORTÁTIL (Windows): MAXIVCI V200 Y ADAPTADOR WI-FI
+﻿REYMAN DIAG v0.4.6 - PRUEBAS EN EL PORTÁTIL (Windows): MAXIVCI V200 Y ADAPTADOR WI-FI
 =====================================================================================
 
 Qué es
@@ -21,10 +21,10 @@ PRUEBA CON LA MAXIVCI V200
 2. Contacto puesto, MOTOR PARADO (para el escaneo de centralitas).
 3. Doble clic en "Iniciar Reyman Diag".
    Se abre una ventana negra (no la cierres) y la app en Chrome o Edge.
-   Arriba debe poner "Modo pruebas v0.4.5".
+   Arriba debe poner "Modo pruebas v0.4.6".
    La ventana negra debe decir "J2534: preparado".
    Si Windows avisa "Windows protegió su PC": "Más información" > "Ejecutar de todas formas".
-4. En la app, pulsa "Autel V200 (J2534)" (o "Autel VCMI (J2534)" si usas la VCMI) y espera la lectura (sale sola).
+4. En la app, pulsa "Autel V200 (J2534)" (o "Otra interfaz Autel (VCMI…)" y elige la tuya) y espera la lectura (sale sola).
 5. Pestaña "Averías" > recuadro "Todas las centralitas" > "Escanear todas las centralitas".
    Tarda unos 20-60 segundos. Saldrá cada centralita con su nombre y averías.
 6. Borrado: solo si quieres probarlo, en UNA centralita con una avería conocida.

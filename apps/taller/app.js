@@ -19,7 +19,7 @@ import { htmlInforme } from './lib/informe.js';
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.5';
+const VERSION = '0.4.6';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -141,7 +141,7 @@ function vConectar() {
       <button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234) o cable USB.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>
       <button class="opcion" data-con="wifi" ${conPuente() ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel V200 (J2534)</strong><span>${conPuente() ? 'MaxiVCI V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
-      <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel VCMI (J2534)</strong><span>${conPuente() ? 'MaxiFlash VCMI por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Otra interfaz Autel (VCMI…)</strong><span>${conPuente() ? `VCMI u otra interfaz J2534 instalada en el portátil.${otraJ2534() ? ` Última: ${esc(otraJ2534())}.` : ''}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="sim">${I.sim}<strong>Simulador</strong><span>Coche de prueba para aprender a usar la app sin adaptador.</span></button>
       <button class="opcion" data-con="consulta">${I.carpeta}<strong>Consultar lecturas guardadas</strong><span>Sin conectar al coche, por matrícula. Para la oficina.</span></button>
     </div>
@@ -155,7 +155,7 @@ function vConectar() {
     if (b.dataset.con === 'sim') return dialogoSimulador();
     if (b.dataset.con === 'wifi') return dialogoWifi();
     if (b.dataset.con === 'j2534') return conectar('j2534', 'V200');
-    if (b.dataset.con === 'vcmi') return conectar('j2534', 'VCMI');
+    if (b.dataset.con === 'vcmi') return dialogoOtraJ2534();
     conectar(b.dataset.con);
   }));
   if (estado.conectado) {
@@ -368,10 +368,29 @@ function dialogoSimulador() {
 // Wi-Fi: solo con el programa de enlace del portátil (la app se abre en http://localhost:35001)
 function conPuente() { return ['localhost', '127.0.0.1'].includes(location.hostname) || !!estado.puente; }
 
+// Interfaz J2534 distinta de la V200 (VCMI…): se elige de las instaladas en el portátil y se recuerda
+function otraJ2534() { try { return localStorage.getItem('reyman-diag-j2534') || ''; } catch { return ''; } }
+async function dialogoOtraJ2534() {
+  if (!estado.puente?.interfaces) await buscarPuente();
+  const lista = (estado.puente?.interfaces || []).filter((n) => n !== 'V200');
+  if (!lista.length) { toast('El programa de enlace no encuentra ninguna otra interfaz J2534 instalada.'); return; }
+  const ult = otraJ2534();
+  const d = dialogo(`<h3>Otra interfaz Autel</h3><p class="suave">Elige la interfaz que tienes enchufada por USB. Si no sabes cuál, prueba primero «MaxiFlash VCMI».</p>
+    <div class="campo"><label for="j2534-sel">Interfaz</label><select id="j2534-sel">${lista.map((n) => `<option ${n === ult || (!ult && n === 'MaxiFlash VCMI') ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
+    <div class="fila-btn"><button class="btn fantasma" value="cancel" formmethod="dialog">Cancelar</button><button class="btn" id="j2534-ok">Conectar</button></div>`);
+  $('#j2534-ok', d).onclick = (e) => {
+    e.preventDefault();
+    const n = $('#j2534-sel', d).value;
+    try { localStorage.setItem('reyman-diag-j2534', n); } catch { /* */ }
+    d.close();
+    conectar('j2534', n);
+  };
+}
+
 // Desde diag.talleresreyman.es: ¿está abierto el programa de enlace en este ordenador? (V200 y adaptador Wi-Fi)
 // Chrome puede preguntar la primera vez si la web puede acceder a los dispositivos de la red local: hay que permitirlo.
 async function buscarPuente() {
-  if (['localhost', '127.0.0.1'].includes(location.hostname) || (DEMO && !PRUEBAS)) return;
+  if (DEMO && !PRUEBAS) return;
   try {
     const r = await fetch('http://localhost:35001/estado', { signal: AbortSignal.timeout(2000), cache: 'no-store' });
     const d = await r.json();

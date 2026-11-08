@@ -12,7 +12,12 @@ $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $appFile = Join-Path $dir 'reyman-diag.html'
 $Host.UI.RawUI.WindowTitle = 'Reyman Diag · enlace (Wi-Fi y J2534)'
 
-function Log($t) { Write-Host ("[{0}] {1}" -f (Get-Date -Format 'HH:mm:ss'), $t) }
+$script:logFile = Join-Path $dir 'enlace.log'
+function Log($t) {
+  $l = "[{0}] {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $t
+  Write-Host $l
+  try { Add-Content -Path $script:logFile -Value $l -Encoding UTF8 } catch { }
+}
 
 # Solo se permite conectar a direcciones de red local (el adaptador), nunca a internet
 function DireccionPermitida([string]$ip) {
@@ -39,28 +44,19 @@ if ([IntPtr]::Size -ne 4) {
   }
 }
 
-# Interfaces J2534 instaladas (registro de Windows), en orden de preferencia: la indicada, V200, VCMI2, VCMI y el resto.
-function ElegirDllJ2534([string]$preferida) {
+# Interfaces J2534 instaladas (registro de Windows): nombre y DLL
+function InterfacesJ2534 {
   $claves = @('HKLM:\SOFTWARE\PassThruSupport.04.04', 'HKLM:\SOFTWARE\WOW6432Node\PassThruSupport.04.04')
   $disp = @()
   foreach ($c in $claves) {
     if (Test-Path $c) {
       foreach ($k in Get-ChildItem $c) {
         $p = Get-ItemProperty $k.PSPath
-        if ($p.FunctionLibrary) { $disp += [pscustomobject]@{ Nombre = [string]$p.Name; DLL = [string]$p.FunctionLibrary } }
+        if ($p.FunctionLibrary -and (Test-Path ([string]$p.FunctionLibrary))) { $disp += [pscustomobject]@{ Nombre = [string]$p.Name; DLL = [string]$p.FunctionLibrary } }
       }
     }
   }
-  $disp = @($disp | Sort-Object DLL -Unique)
-  $patrones = @()
-  if ($preferida) { $patrones += [regex]::Escape($preferida) }
-  $patrones += @('^V200$', 'VCMI2', 'VCMI')
-  $orden = @()
-  foreach ($pat in $patrones) {
-    foreach ($e in @($disp | Where-Object { $_.Nombre -match $pat })) { if (-not ($orden | Where-Object { $_.DLL -eq $e.DLL })) { $orden += $e } }
-  }
-  foreach ($e in $disp) { if (-not ($orden | Where-Object { $_.DLL -eq $e.DLL })) { $orden += $e } }
-  return ,$orden
+  return ,@($disp | Sort-Object DLL -Unique | Sort-Object Nombre)
 }
 
 function AtenderJ2534($ctx) {
@@ -70,21 +66,16 @@ function AtenderJ2534($ctx) {
   $listo = $false
   try {
     if (-not $script:j2534Listo) { EnviarTexto $ws ('PUENTE_ERROR: ' + $script:j2534Motivo); return }
-    $lista = ElegirDllJ2534 $ctx.Request.QueryString['dll']
+    # Solo se carga la DLL de la interfaz elegida en la app (cargar DLL de otras interfaces puede cerrar el programa)
+    $pedida = [string]$ctx.Request.QueryString['dll']
+    $lista = InterfacesJ2534
     if (-not $lista.Count) { EnviarTexto $ws 'PUENTE_ERROR: No hay ninguna interfaz J2534 instalada en este ordenador. Instala Maxi PC Suite de Autel.'; return }
-    # Se usa la primera que esté enchufada (la que se deja abrir): V200, VCMI2, VCMI...
-    $e = $null
-    $ultimo = ''
-    foreach ($c in $lista) {
-      try {
-        $p = New-Object Puente (New-Object PassThruDll $c.DLL)
-        $r = $p.Atender('0 abrir')
-        if ($r -like '0 OK*') { $puente = $p; $e = $c; break }
-        $ultimo = $c.Nombre + ': ' + $r
-      } catch { $ultimo = $c.Nombre + ': ' + $_.Exception.Message }
-    }
-    if (-not $puente) { Log ('J2534: ninguna interfaz responde (' + $ultimo + ')'); EnviarTexto $ws 'PUENTE_ERROR: No se encuentra ninguna interfaz Autel enchufada por USB (V200, VCMI...). Comprueba el cable y que no la esté usando la tablet o Maxi PC Suite.'; return }
-    Log ('J2534: ' + $e.Nombre + ' (' + $e.DLL + ')')
+    $e = $lista | Where-Object { $_.Nombre -eq $pedida } | Select-Object -First 1
+    if (-not $e) { $e = $lista | Where-Object { $_.Nombre -eq 'V200' } | Select-Object -First 1 }
+    if (-not $e) { EnviarTexto $ws ('PUENTE_ERROR: No está instalada la interfaz «' + $pedida + '».'); return }
+    Log ('J2534: abriendo ' + $e.Nombre + ' (' + $e.DLL + ')')
+    $puente = New-Object Puente (New-Object PassThruDll $e.DLL)
+    Log ('J2534: ' + $e.Nombre + ' cargada')
     EnviarTexto $ws ('PUENTE_OK ' + $e.Nombre)
     $listo = $true
     $buf = New-Object byte[] 65536
@@ -194,7 +185,9 @@ function ServirApp($ctx) {
         $res.Headers.Add('Vary', 'Origin')
       }
       if ($ctx.Request.HttpMethod -eq 'OPTIONS') { $res.StatusCode = 204; return }
-      $j = '{"ok":true,"programa":"Reyman Diag enlace","j2534":' + $(if ($script:j2534Listo) { 'true' } else { 'false' }) + '}'
+      $lst = InterfacesJ2534
+      $nombres = @($lst | ForEach-Object { '"' + ($_.Nombre -replace '[\\"]', '') + '"' }) -join ','
+      $j = '{"ok":true,"programa":"Reyman Diag enlace","j2534":' + $(if ($script:j2534Listo) { 'true' } else { 'false' }) + ',"interfaces":[' + $nombres + ']}'
       $b = [Text.Encoding]::UTF8.GetBytes($j)
       $res.ContentType = 'application/json; charset=utf-8'
       $res.Headers.Add('Cache-Control', 'no-store')
