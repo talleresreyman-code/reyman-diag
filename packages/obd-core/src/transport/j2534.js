@@ -35,7 +35,7 @@ export function canalWebSocket(url, WebSocketImpl = globalThis.WebSocket) {
     abrir: () => new Promise((resolve, reject) => {
       let listo = false;
       try { ws = new WebSocketImpl(url); } catch (e) { reject(e); return; }
-      const t = setTimeout(() => { if (!listo) { try { ws.close(); } catch { /* */ } reject(Object.assign(new Error('El programa de enlace no responde.'), { code: 'TIMEOUT' })); } }, 15000);
+      const t = setTimeout(() => { if (!listo) { try { ws.close(); } catch { /* */ } reject(Object.assign(new Error('El programa de enlace no responde.'), { code: 'TIMEOUT' })); } }, 40000);
       ws.onmessage = (ev) => {
         const txt = typeof ev.data === 'string' ? ev.data : new TextDecoder().decode(new Uint8Array(ev.data));
         if (!listo) {

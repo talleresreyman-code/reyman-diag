@@ -2,6 +2,7 @@ node_modules/
 .env
 *.log
 dist/
+deploy/estado/
 apps/cliente/www/
 apps/cliente/dist/
 apps/cliente/android/

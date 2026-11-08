@@ -10,6 +10,7 @@ export const PERMISOS = {
   'diag.enviar_cliente': 'Enviar el informe al cliente',
   'diag.ia': 'Usar el diagnóstico con IA',
   'diag.historial': 'Ver el registro de borrados',
+  'diag.actualizar': 'Actualizar Reyman Diag en el servidor',
 };
 
 // Si la App Reyman todavía no tiene permisos "diag.*" en su catálogo, se usan estos por rol.

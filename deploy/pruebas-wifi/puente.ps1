@@ -39,7 +39,7 @@ if ([IntPtr]::Size -ne 4) {
   }
 }
 
-# Interfaz J2534 instalada (registro de Windows). Preferencia: la indicada, V200, VCMI2, VCMI.
+# Interfaces J2534 instaladas (registro de Windows), en orden de preferencia: la indicada, V200, VCMI2, VCMI y el resto.
 function ElegirDllJ2534([string]$preferida) {
   $claves = @('HKLM:\SOFTWARE\PassThruSupport.04.04', 'HKLM:\SOFTWARE\WOW6432Node\PassThruSupport.04.04')
   $disp = @()
@@ -55,11 +55,12 @@ function ElegirDllJ2534([string]$preferida) {
   $patrones = @()
   if ($preferida) { $patrones += [regex]::Escape($preferida) }
   $patrones += @('^V200$', 'VCMI2', 'VCMI')
+  $orden = @()
   foreach ($pat in $patrones) {
-    $e = $disp | Where-Object { $_.Nombre -match $pat } | Select-Object -First 1
-    if ($e) { return $e }
+    foreach ($e in @($disp | Where-Object { $_.Nombre -match $pat })) { if (-not ($orden | Where-Object { $_.DLL -eq $e.DLL })) { $orden += $e } }
   }
-  return ($disp | Select-Object -First 1)
+  foreach ($e in $disp) { if (-not ($orden | Where-Object { $_.DLL -eq $e.DLL })) { $orden += $e } }
+  return ,$orden
 }
 
 function AtenderJ2534($ctx) {
@@ -69,10 +70,21 @@ function AtenderJ2534($ctx) {
   $listo = $false
   try {
     if (-not $script:j2534Listo) { EnviarTexto $ws ('PUENTE_ERROR: ' + $script:j2534Motivo); return }
-    $e = ElegirDllJ2534 $ctx.Request.QueryString['dll']
-    if (-not $e) { EnviarTexto $ws 'PUENTE_ERROR: No hay ninguna interfaz J2534 instalada en este ordenador. Instala Maxi PC Suite de Autel.'; return }
+    $lista = ElegirDllJ2534 $ctx.Request.QueryString['dll']
+    if (-not $lista.Count) { EnviarTexto $ws 'PUENTE_ERROR: No hay ninguna interfaz J2534 instalada en este ordenador. Instala Maxi PC Suite de Autel.'; return }
+    # Se usa la primera que esté enchufada (la que se deja abrir): V200, VCMI2, VCMI...
+    $e = $null
+    $ultimo = ''
+    foreach ($c in $lista) {
+      try {
+        $p = New-Object Puente (New-Object PassThruDll $c.DLL)
+        $r = $p.Atender('0 abrir')
+        if ($r -like '0 OK*') { $puente = $p; $e = $c; break }
+        $ultimo = $c.Nombre + ': ' + $r
+      } catch { $ultimo = $c.Nombre + ': ' + $_.Exception.Message }
+    }
+    if (-not $puente) { Log ('J2534: ninguna interfaz responde (' + $ultimo + ')'); EnviarTexto $ws 'PUENTE_ERROR: No se encuentra ninguna interfaz Autel enchufada por USB (V200, VCMI...). Comprueba el cable y que no la esté usando la tablet o Maxi PC Suite.'; return }
     Log ('J2534: ' + $e.Nombre + ' (' + $e.DLL + ')')
-    $puente = New-Object Puente (New-Object PassThruDll $e.DLL)
     EnviarTexto $ws ('PUENTE_OK ' + $e.Nombre)
     $listo = $true
     $buf = New-Object byte[] 65536

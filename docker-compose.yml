@@ -8,6 +8,10 @@ services:
       HOST: 0.0.0.0
       PORT: 3020
       DATABASE_URL: postgres://diag:${DB_PASSWORD}@db:5432/diag
+      ACTUALIZADOR_DIR: /data/actualizador
+    # Carpeta compartida con el vigilante de actualizaciones (botón «Actualizar» de la app)
+    volumes:
+      - ./deploy/estado:/data/actualizador
     # Sin puerto en el VPS: solo se llega por la red del Caddy (reyman-diag:3020)
     depends_on:
       db:

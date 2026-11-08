@@ -19,7 +19,7 @@ if ! grep -q '^N8N_CLAVE=.\+' .env && [ -f "$APP/.env" ]; then
   C=$(grep -E '^N8N_(CLAVE|SECRET|APP_KEY)=' "$APP/.env" | head -1 | cut -d= -f2- || true)
   [ -n "$C" ] && sed -i "s|^N8N_CLAVE=.*|N8N_CLAVE=$C|" .env && echo "· Clave de n8n copiada de la App Reyman"
 fi
-docker compose up -d --build
+sh deploy/actualizar.sh --sin-git || docker compose up -d --build
 for i in $(seq 1 20); do docker compose exec -T diag wget -qO- http://127.0.0.1:3020/api/salud >/dev/null 2>&1 && break; sleep 2; done
 docker compose exec -T diag wget -qO- http://127.0.0.1:3020/api/salud && echo " · Reyman Diag en marcha"
 deploy/publicar-caddy.sh

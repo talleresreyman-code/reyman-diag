@@ -2,6 +2,7 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { crearStore } from './store.js';
 import { crearAuth, tiene, PERMISOS } from './auth.js';
@@ -14,6 +15,7 @@ const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 export function leerConfig(env = process.env) {
   return {
     puerto: Number(env.PORT || 3020),
+    actualizadorDir: env.ACTUALIZADOR_DIR || '/data/actualizador',
     host: env.HOST || '127.0.0.1',
     store: env.DATABASE_URL ? 'pg' : 'memoria',
     databaseUrl: env.DATABASE_URL,
@@ -144,6 +146,33 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   });
 
   app.get('/api/salud', async () => ({ ok: true, store: store.tipo }));
+
+  // --- versión y actualización desde la app (como la App Reyman) ---
+  // La app solo deja un aviso («pedido») en la carpeta compartida; el vigilante del servidor (cron) actualiza desde GitHub.
+  const act = (f) => path.join(cfg.actualizadorDir, f);
+  const leerTxt = (f) => { try { return fs.readFileSync(act(f), 'utf8'); } catch { return ''; } };
+  const claves = (t) => Object.fromEntries(t.split('\n').filter((l) => l.includes('=') && !l.startsWith('cambio=')).map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+  app.get('/api/version', async (req) => {
+    const instalada = claves(leerTxt('instalada.txt'));
+    const disp = leerTxt('disponible.txt');
+    const disponible = claves(disp);
+    const cambios = disp.split('\n').filter((l) => l.startsWith('cambio=')).map((l) => { const [commit, fecha, ...m] = l.slice(7).split('|'); return { commit, fecha, mensaje: m.join('|') }; });
+    return {
+      instalada, disponible, cambios, resultado: claves(leerTxt('resultado.txt')),
+      pedido: fs.existsSync(act('pedido')),
+      hayNueva: !!(disponible.commit && instalada.commit && disponible.commit !== instalada.commit),
+      puede: tiene(req.s.permisos, 'diag.actualizar'),
+    };
+  });
+  app.post('/api/version/actualizar', { preHandler: exigir('diag.actualizar') }, async (req, rep) => {
+    if (claves(leerTxt('resultado.txt')).estado === 'actualizando') return rep.code(409).send({ error: 'Ya se está actualizando.' });
+    try { fs.writeFileSync(act('pedido'), `${req.s.usuario.nombre}\n`); } catch { return rep.code(500).send({ error: 'No se pudo avisar al servidor (falta la carpeta compartida).' }); }
+    return { ok: true };
+  });
+  app.post('/api/version/comprobar', { preHandler: exigir('diag.actualizar') }, async () => {
+    try { fs.writeFileSync(act('comprobar'), '1'); } catch { /* */ }
+    return { ok: true };
+  });
 
   app.get('/api/yo', async (req) => ({
     usuario: req.s.usuario,

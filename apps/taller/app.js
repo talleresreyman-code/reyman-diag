@@ -19,7 +19,7 @@ import { htmlInforme } from './lib/informe.js';
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.4';
+const VERSION = '0.4.5';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -140,18 +140,22 @@ function vConectar() {
       <button class="opcion" data-con="ble" ${bt ? '' : 'disabled'}>${I.bt}<strong>Bluetooth</strong><span>${bt ? 'Móvil, tablet o portátil. Elige «vLinker» en la lista.' : !window.isSecureContext ? 'Necesita abrir la app por https://.' : 'Este navegador no permite Bluetooth. Usa Chrome.'}</span></button>
       <button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234) o cable USB.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>
       <button class="opcion" data-con="wifi" ${conPuente() ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
-      <button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>MaxiVCI (J2534)</strong><span>${conPuente() ? 'Interfaz Autel V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      <button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel V200 (J2534)</strong><span>${conPuente() ? 'MaxiVCI V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel VCMI (J2534)</strong><span>${conPuente() ? 'MaxiFlash VCMI por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="sim">${I.sim}<strong>Simulador</strong><span>Coche de prueba para aprender a usar la app sin adaptador.</span></button>
       <button class="opcion" data-con="consulta">${I.carpeta}<strong>Consultar lecturas guardadas</strong><span>Sin conectar al coche, por matrícula. Para la oficina.</span></button>
     </div>
     <details class="peq" style="margin-top:16px" ${PRUEBAS ? 'open' : ''}><summary>Registro de comunicación</summary><div class="registro" id="registro">${esc(estado.registro.slice(-60).join('\n'))}</div>
-      <div class="fila-btn"><button class="btn fantasma" id="reg-descargar">Descargar registro</button>${PRUEBAS ? `<span class="peq suave">${estado.lecturasSesion.length} lecturas y pruebas en esta sesión</span>` : ''}</div></details>`;
+      <div class="fila-btn"><button class="btn fantasma" id="reg-descargar">Descargar registro</button>${PRUEBAS ? `<span class="peq suave">${estado.lecturasSesion.length} lecturas y pruebas en esta sesión</span>` : ''}</div></details>
+    ${DEMO ? '' : '<div id="version-diag" class="peq suave" style="margin-top:16px"></div>'}`;
   $('#reg-descargar', el).onclick = descargarRegistro;
+  pintarVersion();
   el.querySelectorAll('[data-con]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.con === 'consulta') return dialogoConsulta();
     if (b.dataset.con === 'sim') return dialogoSimulador();
     if (b.dataset.con === 'wifi') return dialogoWifi();
-    if (b.dataset.con === 'j2534') return conectar('j2534');
+    if (b.dataset.con === 'j2534') return conectar('j2534', 'V200');
+    if (b.dataset.con === 'vcmi') return conectar('j2534', 'VCMI');
     conectar(b.dataset.con);
   }));
   if (estado.conectado) {
@@ -161,6 +165,54 @@ function vConectar() {
     $('#desconectar').onclick = desconectar;
     $('#releer').onclick = leerTodo;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Versión instalada y botón «Actualizar» (como en la App Reyman): el servidor se actualiza desde GitHub
+// ---------------------------------------------------------------------------
+const fechaCorta = (f) => { try { return new Date(f).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch { return f || ''; } };
+async function pintarVersion() {
+  const x = $('#version-diag');
+  if (!x || DEMO) return;
+  let v;
+  try { v = await (await fetch('/api/version', { credentials: 'include' })).json(); } catch { return; }
+  if (!$('#version-diag')) return;
+  const inst = v.instalada || {};
+  let html = `Reyman Diag ${esc(VERSION)}${inst.commit ? ` · servidor ${esc(inst.commit)} (${esc(fechaCorta(inst.fecha))})` : ''}`;
+  const r = v.resultado || {};
+  if (v.pedido || r.estado === 'actualizando') html += ' · <strong>Actualizando el servidor…</strong>';
+  else if (r.estado === 'error' && r.fin) html += ' · <span class="peligro-txt">La última actualización falló</span>';
+  if (v.puede) {
+    if (v.hayNueva && !v.pedido && r.estado !== 'actualizando') {
+      html += `<div class="aviso peq" style="margin-top:8px"><strong>Hay una versión nueva</strong> (${esc(v.disponible.commit)}): ${esc(v.disponible.mensaje || '')}
+        ${(v.cambios || []).length > 1 ? `<ul>${v.cambios.slice(0, 8).map((c) => `<li>${esc(c.mensaje)}</li>`).join('')}</ul>` : ''}
+        <div class="fila-btn"><button class="btn" id="ver-actualizar">Actualizar el servidor</button></div></div>`;
+    } else html += ' · <button class="btn fantasma" id="ver-comprobar" style="padding:2px 8px">Buscar actualizaciones</button>';
+  }
+  x.innerHTML = html;
+  const b = $('#ver-actualizar');
+  if (b) b.onclick = async () => {
+    b.disabled = true;
+    try {
+      const r2 = await fetch('/api/version/actualizar', { method: 'POST', credentials: 'include' });
+      if (!r2.ok) throw new Error((await r2.json().catch(() => ({}))).error || `Error ${r2.status}`);
+      toast('Actualizando el servidor. Tarda unos minutos; la página se recargará sola.');
+      esperarActualizacion(inst.commit);
+    } catch (e) { toast(e.message); b.disabled = false; }
+    pintarVersion();
+  };
+  const c = $('#ver-comprobar');
+  if (c) c.onclick = async () => { c.disabled = true; await fetch('/api/version/comprobar', { method: 'POST', credentials: 'include' }).catch(() => {}); toast('Buscando… en un minuto se ve si hay versión nueva.'); setTimeout(pintarVersion, 65000); };
+}
+function esperarActualizacion(antes) {
+  const t = setInterval(async () => {
+    try {
+      const v = await (await fetch('/api/version', { credentials: 'include' })).json();
+      const r = v.resultado || {};
+      if (r.estado === 'ok' && v.instalada?.commit && v.instalada.commit !== antes) { clearInterval(t); toast('Servidor actualizado. Recargando…'); setTimeout(() => location.reload(), 1500); }
+      else if (r.estado === 'error') { clearInterval(t); toast('La actualización ha fallado. Avisa a Claude con el archivo ultima.log del servidor.'); pintarVersion(); }
+    } catch { /* el servidor se está reiniciando */ }
+  }, 10000);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +405,7 @@ async function conectar(tipo, coche) {
   try {
     if (estado.conectado) await desconectar(true);
     paso('Buscando el adaptador…');
-    estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
+    estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ puente: `ws://localhost:35001/j2534${coche ? `?dll=${encodeURIComponent(coche)}` : ''}`, log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
     await estado.transporte.conectar();
     estado.transporte.alDesconectarse(() => { estado.conectado = false; estadoBarra('Adaptador desconectado'); toast('Se ha perdido la conexión con el adaptador.'); });
     estado.elm = new Elm327(estado.transporte, { log, timeoutMs: tipo === 'j2534' ? 20000 : undefined });
