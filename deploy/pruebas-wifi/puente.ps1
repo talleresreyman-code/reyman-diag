@@ -8,7 +8,8 @@
 
 param([int]$Puerto = 35001)
 $ErrorActionPreference = 'Stop'
-$dir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$script:esteScript = $MyInvocation.MyCommand.Path
+$dir = Split-Path -Parent $script:esteScript
 $appFile = Join-Path $dir 'reyman-diag.html'
 $Host.UI.RawUI.WindowTitle = 'Reyman Diag · enlace (Wi-Fi y J2534)'
 
@@ -42,6 +43,8 @@ function EnviarTexto($ws, [string]$t) {
 
 # --- J2534 ---
 $script:j2534Listo = $false
+$script:dllCargada = $null
+$script:reiniciar = $false
 $script:j2534Motivo = ''
 if ([IntPtr]::Size -ne 4) {
   $script:j2534Motivo = 'Para usar la interfaz J2534 abre el programa con «Iniciar Reyman Diag» (PowerShell de 32 bits).'
@@ -83,6 +86,14 @@ function AtenderJ2534($ctx) {
     $e = $lista | Where-Object { $_.Nombre -eq $pedida } | Select-Object -First 1
     if (-not $e) { $e = $lista | Where-Object { $_.Nombre -eq 'V200' } | Select-Object -First 1 }
     if (-not $e) { EnviarTexto $ws ('PUENTE_ERROR: No está instalada la interfaz «' + $pedida + '».'); return }
+    # Windows no deja bien usar dos interfaces distintas en el mismo programa: al cambiar, el enlace se reinicia solo
+    if ($script:dllCargada -and $script:dllCargada -ne $e.DLL) {
+      Log ('J2534: cambio de interfaz a ' + $e.Nombre + ': reiniciando el enlace')
+      EnviarTexto $ws 'PUENTE_ERROR: Cambiando de interfaz: el enlace se reinicia solo. Vuelve a pulsar Conectar en 5 segundos.'
+      $script:reiniciar = $true
+      return
+    }
+    $script:dllCargada = $e.DLL
     Log ('J2534: abriendo ' + $e.Nombre + ' (' + $e.DLL + ')')
     $puente = New-Object Puente (New-Object PassThruDll $e.DLL)
     Log ('J2534: ' + $e.Nombre + ' cargada')
@@ -248,7 +259,14 @@ while ($l.IsListening) {
   try {
     $ctx = $l.GetContext()
     if ($ctx.Request.IsWebSocketRequest -and $ctx.Request.Url.AbsolutePath -eq '/ws') { AtenderWebSocket $ctx }
-    elseif ($ctx.Request.IsWebSocketRequest -and $ctx.Request.Url.AbsolutePath -eq '/j2534') { AtenderJ2534 $ctx }
+    elseif ($ctx.Request.IsWebSocketRequest -and $ctx.Request.Url.AbsolutePath -eq '/j2534') {
+      AtenderJ2534 $ctx
+      if ($script:reiniciar) {
+        $l.Stop()
+        Start-Process -FilePath "$env:SystemRoot\SysWOW64\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $script:esteScript + '"'))
+        exit 0
+      }
+    }
     else { ServirApp $ctx }
   } catch {
     Log ("Error: " + $_.Exception.Message)

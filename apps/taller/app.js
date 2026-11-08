@@ -460,6 +460,13 @@ async function conectar(tipo, coche) {
     estado.conectado = false;
     estadoBarra('Sin conectar');
     if (e.name === 'NotFoundError' || e.name === 'AbortError') { prog.hidden = true; return; }
+    // Cambio de interfaz Autel: el enlace se reinicia solo; se vuelve a intentar sin que haya que pulsar nada
+    if (/Cambiando de interfaz/.test(e.message) && !estado.reintentoJ2534) {
+      estado.reintentoJ2534 = true;
+      prog.innerHTML = '<div class="progreso"><span class="giro"></span>Cambiando de interfaz: el programa de enlace se reinicia (unos segundos)…</div>';
+      setTimeout(() => conectar(tipo, coche).finally(() => { estado.reintentoJ2534 = false; }), 7000);
+      return;
+    }
     prog.innerHTML = `<div class="aviso error"><strong>No se ha podido conectar.</strong><br>${esc(e.message)}</div>
       <p class="peq suave">Comprueba que el adaptador tiene la luz encendida, que el contacto está puesto y que el Bluetooth del dispositivo está activado. En Android, la app pide permiso de ubicación/dispositivos cercanos para buscar el adaptador.</p>`;
   }
