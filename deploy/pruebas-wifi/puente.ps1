@@ -172,7 +172,23 @@ function ServirApp($ctx) {
   $res = $ctx.Response
   try {
     $ruta = $ctx.Request.Url.AbsolutePath
-    if ($ruta -eq '/' -or $ruta -eq '/index.html') {
+    if ($ruta -eq '/estado') {
+      # Para la app online (diag.talleresreyman.es): saber que el enlace está abierto en este ordenador
+      $origen = $ctx.Request.Headers['Origin']
+      if ($origen -match '^https://([a-z0-9-]+\.)*talleresreyman\.es$' -or $origen -match '^http://(localhost|127\.0\.0\.1)(:\d+)?$') {
+        $res.Headers.Add('Access-Control-Allow-Origin', $origen)
+        $res.Headers.Add('Access-Control-Allow-Private-Network', 'true')
+        $res.Headers.Add('Access-Control-Allow-Methods', 'GET')
+        $res.Headers.Add('Vary', 'Origin')
+      }
+      if ($ctx.Request.HttpMethod -eq 'OPTIONS') { $res.StatusCode = 204; return }
+      $j = '{"ok":true,"programa":"Reyman Diag enlace","j2534":' + $(if ($script:j2534Listo) { 'true' } else { 'false' }) + '}'
+      $b = [Text.Encoding]::UTF8.GetBytes($j)
+      $res.ContentType = 'application/json; charset=utf-8'
+      $res.Headers.Add('Cache-Control', 'no-store')
+      $res.ContentLength64 = $b.Length
+      $res.OutputStream.Write($b, 0, $b.Length)
+    } elseif ($ruta -eq '/' -or $ruta -eq '/index.html') {
       $b = [IO.File]::ReadAllBytes($appFile)
       $res.ContentType = 'text/html; charset=utf-8'
       $res.Headers.Add('Cache-Control', 'no-store')
@@ -203,7 +219,7 @@ try { $l.Start() } catch {
 
 Write-Host ''
 Write-Host '  Reyman Diag · enlace en marcha (Wi-Fi y J2534)' -ForegroundColor Cyan
-Write-Host "  App: http://localhost:$Puerto  (se abre sola en el navegador)"
+Write-Host "  App: http://localhost:$Puerto  (se abre sola en el navegador) o https://diag.talleresreyman.es"
 Write-Host '  1. Conecta el portátil a la red Wi-Fi del adaptador (WiFi_OBDII o parecido).'
 Write-Host '  2. En la app, pulsa «Wi-Fi».'
 Write-Host '  3. Interfaz Autel (V200) por USB: en la app, pulsa «MaxiVCI (J2534)».'

@@ -19,7 +19,7 @@ import { htmlInforme } from './lib/informe.js';
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.3';
+const VERSION = '0.4.4';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -76,6 +76,9 @@ async function arrancar() {
   }
   pintarMarco();
   ir('conectar');
+  buscarPuente();
+  // Si se abre el programa de enlace después, se detecta solo
+  setInterval(() => { if (!estado.puente && !estado.conectado) buscarPuente(); }, 10000);
   if ('serviceWorker' in navigator && !DEMO) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
@@ -136,8 +139,8 @@ function vConectar() {
     <div class="opciones-conexion">
       <button class="opcion" data-con="ble" ${bt ? '' : 'disabled'}>${I.bt}<strong>Bluetooth</strong><span>${bt ? 'Móvil, tablet o portátil. Elige «vLinker» en la lista.' : !window.isSecureContext ? 'Necesita abrir la app por https://.' : 'Este navegador no permite Bluetooth. Usa Chrome.'}</span></button>
       <button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234) o cable USB.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>
-      <button class="opcion" data-con="wifi" ${conPuente() ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Solo desde el portátil, abriendo «Iniciar Reyman Diag».'}</span></button>
-      <button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>MaxiVCI (J2534)</strong><span>${conPuente() ? 'Interfaz Autel V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Solo desde el portátil, abriendo «Iniciar Reyman Diag».'}</span></button>
+      <button class="opcion" data-con="wifi" ${conPuente() ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      <button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>MaxiVCI (J2534)</strong><span>${conPuente() ? 'Interfaz Autel V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="sim">${I.sim}<strong>Simulador</strong><span>Coche de prueba para aprender a usar la app sin adaptador.</span></button>
       <button class="opcion" data-con="consulta">${I.carpeta}<strong>Consultar lecturas guardadas</strong><span>Sin conectar al coche, por matrícula. Para la oficina.</span></button>
     </div>
@@ -311,7 +314,18 @@ function dialogoSimulador() {
 }
 
 // Wi-Fi: solo con el programa de enlace del portátil (la app se abre en http://localhost:35001)
-function conPuente() { return ['localhost', '127.0.0.1'].includes(location.hostname); }
+function conPuente() { return ['localhost', '127.0.0.1'].includes(location.hostname) || !!estado.puente; }
+
+// Desde diag.talleresreyman.es: ¿está abierto el programa de enlace en este ordenador? (V200 y adaptador Wi-Fi)
+// Chrome puede preguntar la primera vez si la web puede acceder a los dispositivos de la red local: hay que permitirlo.
+async function buscarPuente() {
+  if (['localhost', '127.0.0.1'].includes(location.hostname) || (DEMO && !PRUEBAS)) return;
+  try {
+    const r = await fetch('http://localhost:35001/estado', { signal: AbortSignal.timeout(2000), cache: 'no-store' });
+    const d = await r.json();
+    if (d.ok) { estado.puente = d; if ($('#v-conectar') && !estado.conectado) vConectar(); }
+  } catch { estado.puente = null; }
+}
 function cfgWifi() {
   try { return { ...WIFI_POR_DEFECTO, ...JSON.parse(localStorage.getItem('reyman-diag-wifi') || '{}') }; } catch { return { ...WIFI_POR_DEFECTO }; }
 }
