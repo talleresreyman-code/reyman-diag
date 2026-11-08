@@ -28,11 +28,6 @@ try {
   foreach ($o in $otros) { $pr = Get-Process -Id $o -ErrorAction SilentlyContinue; if ($pr -and $pr.ProcessName -match 'powershell') { Log ('Cerrando un enlace anterior (proceso ' + $o + ')'); Stop-Process -Id $o -Force; Start-Sleep -Milliseconds 800 } }
 } catch { }
 
-# Ventana minimizada en la barra de tareas
-try {
-  Add-Type -Name Ventana -Namespace Reyman -MemberDefinition '[DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow(); [DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int n);'
-  [void][Reyman.Ventana]::ShowWindow([Reyman.Ventana]::GetConsoleWindow(), 6)
-} catch { }
 
 # Solo se permite conectar a direcciones de red local (el adaptador), nunca a internet
 function DireccionPermitida([string]$ip) {
