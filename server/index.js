@@ -9,6 +9,7 @@ import { crearAuth, tiene, PERMISOS } from './auth.js';
 import { buscarOts, enviarCorreo, diagnosticoIa } from './integraciones.js';
 import { pdfInforme } from './pdf.js';
 import { buscarTaller, fichaPublica, TALLERES_CONNECT } from './connect-talleres.js';
+import { desdeSesion, aCsv as visorCsv } from '../packages/obd-core/src/visor.js';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -246,8 +247,8 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
       inicio: b.inicio || new Date().toISOString(), duracion_s: Number(b.duracion_s) || 0, pids: b.pids, muestras: b.muestras.slice(0, 20000),
       eventos: Array.isArray(b.eventos) ? b.eventos.slice(0, 500).map((e) => ({ t: Number(e.t) || 0, tipo: String(e.tipo || 'marca').slice(0, 20), detalle: e.detalle ? String(e.detalle).slice(0, 200) : null })) : [],
     });
-    const año = new Date().getFullYear();
-    return { id: r.id, destino: `OneDrive: DIAGNOSIS OBD/${año}/${b.ot || 'SIN OT'} ${limpiarMat(b.matricula) || ''} (esta noche)` };
+    const ruta = rutaOneDrive({ ot: b.ot, matricula: limpiarMat(b.matricula), vin: b.vin, inicio: b.inicio || new Date() });
+    return { id: r.id, destino: `se ve en «Datos grabados» y esta noche se copia a OneDrive (${ruta.carpeta.replace(/^01_TALLERES REYMAN\//, '')})` };
   });
 
   // --- visor de grabaciones ---
@@ -307,8 +308,8 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   };
   app.get('/api/ingest/sesiones', { preHandler: ingest }, async (req) => {
     const t = req.query.taller || cfg.tenantPorDefecto;
-    const filas = await store.sesionesPendientes(t);
-    return { sesiones: filas.map((s) => ({ ...s, csv: sesionCsv(s) })) };
+    const filas = await store.sesionesPendientes(t, 50);
+    return { sesiones: filas.map((s) => ({ id: s.id, ot: s.ot, matricula: s.matricula, vin: s.vin, inicio: s.inicio, duracion_s: s.duracion_s, num_muestras: s.num_muestras, ...rutaOneDrive(s), csv: sesionCsv(s) })) };
   });
   app.post('/api/ingest/sesiones/:id/subida', { preHandler: ingest }, async (req, rep) => {
     const ok = await store.marcarSesionSubida(req.query.taller || cfg.tenantPorDefecto, req.params.id, String(req.body?.destino || ''));
@@ -325,11 +326,23 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   return { app, store };
 }
 
+// CSV para Excel (separador «;», coma decimal y marcas), el mismo que descarga el visor
 function sesionCsv(s) {
-  const pids = s.pids || [];
-  const cab = ['t_s', ...pids.map((p) => `${p.nombre} (${p.unidad})`)];
-  const filas = (s.muestras || []).map((m) => [(m.t / 1000).toFixed(2), ...pids.map((p) => m.v?.[p.pid] ?? '')].join(';'));
-  return [cab.join(';'), ...filas].join('\n');
+  return visorCsv(desdeSesion(s));
+}
+
+// Carpeta y nombre en OneDrive: 01_TALLERES REYMAN/DIAGNOSIS OBD/<año>/1-A-<OT> <matrícula>/ (como INFORMES AUTEL)
+export function rutaOneDrive(s) {
+  const f = new Date(s.inicio || s.creada || Date.now());
+  const p = Object.fromEntries(new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(f).map((x) => [x.type, x.value]));
+  const limpio = (x) => String(x || '').replace(/[\\/:*?"<>|#%]+/g, '').trim();
+  const mat = limpio(s.matricula);
+  const ot = limpio(s.ot);
+  const sub = ot ? `1-A-${ot}${mat ? ` ${mat}` : ''}` : `SIN OT/${mat || limpio(s.vin) || 'SIN MATRICULA'}`;
+  return {
+    carpeta: `01_TALLERES REYMAN/DIAGNOSIS OBD/${p.year}/${sub}`,
+    nombre: `${p.year}${p.month}${p.day}_${p.hour}${p.minute}_Prueba de carretera${mat ? `_${mat}` : ''}.csv`,
+  };
 }
 const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 

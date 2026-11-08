@@ -80,7 +80,9 @@ test('sesiones: guardar y n8n las recoge en CSV con clave', async () => {
   assert.equal(sin.statusCode, 401);
   const con = await app.inject({ url: '/api/ingest/sesiones', headers: { 'x-api-key': 'k' } });
   const ses = con.json().sesiones[0];
-  assert.match(ses.csv, /Régimen motor \(rpm\)\n0.00;800\n0.50;1200/);
+  assert.match(ses.csv, /Régimen motor \(rpm\);evento\r\n0;800;\r\n0,5;1200;/);
+  assert.match(ses.carpeta, /^01_TALLERES REYMAN\/DIAGNOSIS OBD\/\d{4}\/1-A-261402 4521KLM$/);
+  assert.match(ses.nombre, /^\d{8}_\d{4}_Prueba de carretera_4521KLM\.csv$/);
   const m = await app.inject({ method: 'POST', url: `/api/ingest/sesiones/${ses.id}/subida`, headers: { 'x-api-key': 'k' }, payload: { destino: 'x' } });
   assert.equal(m.statusCode, 200);
   const otra = await app.inject({ url: '/api/ingest/sesiones', headers: { 'x-api-key': 'k' } });

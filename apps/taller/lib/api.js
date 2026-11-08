@@ -74,7 +74,7 @@ function apiDemo() {
       return { sesiones: lista.map(({ muestras, pids, ...x }) => ({ ...x, num_muestras: muestras.length, datos: pids.map((p) => p.nombre), con_datos: true })) };
     },
     async obtenerSesion(i) { await espera(150); const s = mem.sesiones.find((x) => x.id === i); if (!s) throw new Error('Grabación no encontrada.'); return s; },
-    async guardarSesion(s) { await espera(); const nuevo = id(); mem.sesiones.unshift({ ...s, id: nuevo, usuario: 'Mecánico (demo)', num_muestras: s.muestras.length, creada: new Date().toISOString() }); return { id: nuevo, destino: `OneDrive · DIAGNOSIS OBD/${new Date().getFullYear()}/${s.ot || 'sin OT'} ${s.matricula || ''}` }; },
+    async guardarSesion(s) { await espera(); const nuevo = id(); mem.sesiones.unshift({ ...s, id: nuevo, usuario: 'Mecánico (demo)', num_muestras: s.muestras.length, creada: new Date().toISOString() }); return { id: nuevo, destino: `se ve en «Datos grabados» y esta noche se copia a OneDrive (DIAGNOSIS OBD/${new Date().getFullYear()}/${s.ot ? `1-A-${s.ot}` : 'SIN OT'} ${s.matricula || ''})` }; },
     async enviarInforme(d) { await espera(600); return { ok: true, enviadoA: d.email, desde: 'talleresreyman@gmail.com', demo: true }; },
     async diagnosticoIa({ lectura }) {
       await espera(1200);

@@ -102,6 +102,7 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Tabla de valores del tramo visible (en el cursor, mínimo, máximo, media; tocar mín./máx. lleva a ese instante). Marcas: botón **«Marcar momento»** mientras se graba en «En vivo» y «Añadir marca en el cursor» en el visor. Descargar CSV (lo visible o todo) y JSON del visor.
 - Las sesiones **se quedan en la base** aunque n8n las copie a OneDrive (antes se vaciaban). Migración `003_sesiones_visor.sql` (columna `eventos`). Las antiguas ya vaciadas salen como «Solo en OneDrive».
 - Modo demostración con una prueba de carretera de ejemplo (tirón a 1:35).
+- **Copia a OneDrive** (flujo n8n «Reyman Diag · copia nocturna de grabaciones a OneDrive», id MU5hnh7TBvDlrQE2): cada noche a las 02:47 pide `http://reyman-diag:3020/api/ingest/sesiones` (red interna de Docker, cabecera `x-api-key` = `DIAG_INGEST_KEY` del `.env` del VPS, credencial n8n «Reyman Diag (copia a OneDrive)»), sube cada CSV (formato Excel, con marcas) a `01_TALLERES REYMAN/DIAGNOSIS OBD/<año>/1-A-<OT> <matrícula>/AAAAMMDD_HHMM_Prueba de carretera_<matrícula>.csv` (sin OT: `SIN OT/<matrícula>`) y la marca como copiada. Sin IA, sin coste.
 
 ### Pruebas
 - **97 pruebas automáticas.**
