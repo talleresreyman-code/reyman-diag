@@ -40,7 +40,7 @@ test('Nombres Ford por dirección y readiness juntando centralitas (Kuga híbrid
   assert.deepEqual(c.map((x) => x.nombre), ['BECM (batería alta tensión)', 'DCDC (convertidor 12 V)', 'Centralita 999']);
   const { Obd } = await import('@reyman/obd-core/obd/obd.js');
   // Respuestas reales del Kuga: 7EE (híbrido) contesta antes que el motor
-  const falso = { pedir: async () => ({ respuestas: [{ ecu: '7EE', datos: [0x01, 0x00, 0x04, 0x00, 0x00] }, { ecu: '7E8', datos: [0x01, 0x00, 0x07, 0xE1, 0x00] }] }) };
+  const falso = { pedirPid: async () => ({ respuestas: [{ ecu: '7EE', datos: [0x01, 0x00, 0x04, 0x00, 0x00] }, { ecu: '7E8', datos: [0x01, 0x00, 0x07, 0xE1, 0x00] }] }) };
   const r = await Obd.prototype.readiness.call(falso);
   assert.equal(r.ecu, '7E8');
   assert.equal(r.monitores.length, 7);

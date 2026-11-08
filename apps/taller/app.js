@@ -1,7 +1,7 @@
 // Reyman Diag · aplicación
 import { Elm327 } from '@reyman/obd-core/obd/elm327.js';
 import { Obd } from '@reyman/obd-core/obd/obd.js';
-import { GRUPOS_EN_VIVO, PIDS } from '@reyman/obd-core/obd/pids.js';
+import { gruposEnVivo, hex as hexb } from '@reyman/obd-core/obd/pids.js';
 import { crearTransporteBle, bleDisponible } from '@reyman/obd-core/transport/ble.js';
 import { crearTransporteSerie, serieDisponible } from '@reyman/obd-core/transport/serie.js';
 import { crearSimulador, COCHES_SIM } from '@reyman/obd-core/transport/simulador.js';
@@ -19,7 +19,7 @@ import { htmlInforme } from './lib/informe.js';
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.6';
+const VERSION = '0.4.7';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -49,7 +49,7 @@ const estado = {
   ot: null, // { ot, matricula, cliente, vehiculo }
   vista: 'conectar',
   soloConsulta: false,
-  vivo: { grupo: GRUPOS_EN_VIVO[0].id, hist: {}, sel: null, activo: false, grabando: null },
+  vivo: { grupo: 'basico', hist: {}, sel: null, activo: false, grabando: null, ausentes: new Set(), canales: [], foto: null },
   registro: [],
   registroCompleto: [], // todo lo enviado y recibido (para descargar)
   lecturasSesion: [], // lecturas y pruebas de esta sesión (para descargar)
@@ -447,7 +447,7 @@ async function conectar(tipo, coche) {
     await estado.transporte.conectar();
     estado.transporte.alDesconectarse(() => { estado.conectado = false; estadoBarra('Adaptador desconectado'); toast('Se ha perdido la conexión con el adaptador.'); });
     estado.elm = new Elm327(estado.transporte, { log, timeoutMs: tipo === 'j2534' ? 20000 : undefined });
-    estado.uds = null; estado.modo06 = null; estado.bateriaHv = null;
+    estado.uds = null; estado.modo06 = null; estado.modo09 = null; estado.bateriaHv = null;
     if (estado.hvVivo) { clearInterval(estado.hvVivo); estado.hvVivo = null; }
     paso('Comunicando con el coche…');
     await estado.elm.iniciar();
@@ -489,12 +489,16 @@ async function leerTodo() {
   l.usuario = estado.yo?.usuario?.nombre;
   // El escaneo de todas las centralitas sigue valiendo tras releer; y si dio el bastidor, se reutiliza
   if (estado.modo06) l.modo06 = estado.modo06;
+  if (estado.modo09) l.modo09 = estado.modo09;
   if (estado.bateriaHv) l.bateriaHv = estado.bateriaHv;
   if (estado.uds) {
     l.uds = estado.uds;
     if (estado.uds.vin && !l.vehiculo?.valido) l.vehiculo = { ...decodificarVin(estado.uds.vin), fuente: 'UDS (22 F190)' };
   }
   estado.lectura = l;
+  estado.vivo.ausentes = new Set();
+  estado.vivo.hist = {};
+  estado.vivo.foto = null;
   estado.lecturaId = null;
   estado.lecturasSesion.push({ tipo: 'lectura', fecha: l.fecha, transporte: estado.transporte?.tipo, lectura: l });
   estadoBarra(`${estado.transporte.nombre}${l.tension ? ` · ${formatear(l.tension)} V` : ''}`, 'on');
@@ -896,9 +900,55 @@ function vItv() {
     <h2>Monitores</h2>
     <div class="panel"><ul class="monitores">${rd.monitores.map((m) => `<li><span>${esc(m.nombre)}</span><span class="${m.estado === 'ok' ? 'ok' : 'pend'}">${m.estado === 'ok' ? 'Completado' : 'Pendiente'}</span></li>`).join('')}</ul></div>
     ${rd.semaforo === 'amarillo' ? '<p class="peq suave">Para completar los monitores suele bastar con 2-3 ciclos de conducción mixta (motor frío hasta temperatura, ciudad y carretera). El de evaporación y el del filtro de partículas son los que más tardan.</p>' : ''}
-    <section class="todas" id="m06">${htmlModo06()}</section>`;
+    <section class="todas" id="m06">${htmlModo06()}</section>
+    <section class="todas" id="m09">${htmlModo09()}</section>
+    ${estado.lectura.protocoloObd ? `<p class="peq suave">Protocolo: ${esc(estado.lectura.protocoloObd)}.</p>` : ''}`;
   const s06 = $('#m06', el);
   s06.onclick = (e) => { if (e.target.closest('#m06-leer')) leerModo06(); };
+  $('#m09', el).onclick = (e) => { if (e.target.closest('#m09-leer')) leerModo09(); };
+}
+
+// Servicio 09: calibraciones con CVN y contadores de uso de los monitores (IUMPR)
+function htmlModo09() {
+  const m = estado.modo09;
+  const ocupado = estado.m09Ocupado;
+  const cab = `<h2>Calibraciones y uso de los monitores (servicio 09)</h2>
+    <p class="peq suave">Software de cada centralita con su suma de verificación (CVN: si no coincide con la de fábrica, la centralita está modificada) y cuántas veces termina cada monitor respecto a las veces que se dieron las condiciones. Un monitor que casi nunca termina explica por qué la ITV lo ve «sin completar».</p>`;
+  const boton = estado.conectado ? `<div class="fila-btn"><button class="btn sec" id="m09-leer" ${ocupado ? 'disabled' : ''}>${m ? 'Leer de nuevo' : 'Leer calibraciones y contadores'}</button></div>` : '';
+  if (ocupado) return `${cab}<p class="peq">${esc(ocupado)}</p>`;
+  if (!m) return `${cab}${boton}`;
+  if (m.error) return `${cab}<div class="aviso">${esc(m.error)}</div>${boton}`;
+  const bloques = m.ecus.map((e) => {
+    const cal = e.calibraciones?.length
+      ? `<table class="m06"><thead><tr><th>Calibración</th><th>CVN</th></tr></thead><tbody>${e.calibraciones.map((c) => `<tr><td>${esc(c.id || '—')}</td><td class="num">${esc(c.cvn || '—')}</td></tr>`).join('')}</tbody></table>` : '';
+    const ipt = e.ipt?.monitores?.filter((x) => x.condiciones).length
+      ? `<p class="peq">Ciclos de conducción válidos: <strong>${e.ipt.ciclosObd}</strong> · arranques: ${e.ipt.arranques}</p>
+        <table class="m06"><thead><tr><th>Monitor</th><th>Terminado / condiciones</th><th>Ratio</th></tr></thead><tbody>
+        ${e.ipt.monitores.filter((x) => x.condiciones).map((x) => `<tr class="${x.ratio < 0.1 ? 'm06-mal' : x.ratio < 0.336 ? 'm06-cerca' : ''}"><td>${esc(x.nombre)}</td><td class="num">${x.completado} / ${x.condiciones}</td><td class="num">${formatear(x.ratio)}</td></tr>`).join('')}
+        </tbody></table>` : '';
+    if (!cal && !ipt && !e.serie) return '';
+    return `<h3>${esc(e.nombre || e.modulo)} <small class="suave">${esc(e.ecu)}</small></h3>${e.serie ? `<p class="peq">Nº de serie: ${esc(e.serie)}</p>` : ''}${cal}${ipt}`;
+  }).join('');
+  return `${cab}${bloques ? `<div class="tabla-scroll">${bloques}</div><p class="peq suave">Ratio orientativo: por debajo de 0,336 (ámbar) el monitor termina poco; por debajo de 0,1 (rojo), casi nunca.</p>` : '<p>El coche no da estos datos.</p>'}${boton}`;
+}
+
+async function leerModo09() {
+  if (!estado.conectado || estado.m09Ocupado) return;
+  estado.bateriaOcupada = true;
+  const pintar = () => { const s = $('#m09'); if (s) s.innerHTML = htmlModo09(); };
+  const paso = (t) => { estado.m09Ocupado = t; pintar(); estadoBarra(t, 'busy'); };
+  try {
+    estado.modo09 = await estado.obd.modo09(paso);
+  } catch (e) {
+    estado.modo09 = { fecha: new Date().toISOString(), error: e.message, ecus: [] };
+  } finally {
+    estado.lectura.modo09 = estado.modo09;
+    estado.lecturasSesion.push({ tipo: 'modo09', fecha: estado.modo09.fecha, modo09: estado.modo09 });
+    estado.m09Ocupado = null;
+    estado.bateriaOcupada = false;
+    estadoBarra(`${estado.transporte?.nombre || ''}`, estado.conectado ? 'on' : '');
+    pintar();
+  }
 }
 
 // Modo 06: pruebas internas de los monitores (lo cerca del límite que está cada cosa)
@@ -953,23 +1003,61 @@ async function leerModo06() {
 // ---------------------------------------------------------------------------
 function vVivo() {
   const el = $('#v-vivo');
-  const sop = new Set(estado.lectura.soportados || []);
-  const grupos = GRUPOS_EN_VIVO.map((g) => ({ ...g, pids: g.pids.filter((p) => sop.has(p)) })).filter((g) => g.pids.length);
+  const grupos = gruposEnVivo(estado.lectura.soportados || []).map((g) => ({ ...g, canales: g.canales.filter((c) => !estado.vivo.ausentes.has(c.clave)) })).filter((g) => g.canales.length);
   if (!grupos.find((g) => g.id === estado.vivo.grupo)) estado.vivo.grupo = grupos[0]?.id;
   const g = grupos.find((x) => x.id === estado.vivo.grupo);
-  if (!estado.vivo.sel || !g?.pids.includes(estado.vivo.sel)) estado.vivo.sel = g?.pids[0];
+  estado.vivo.canales = g?.canales || [];
+  if (!estado.vivo.sel || !estado.vivo.canales.some((c) => c.clave === estado.vivo.sel)) estado.vivo.sel = estado.vivo.canales[0]?.clave;
+  const selC = estado.vivo.canales.find((c) => c.clave === estado.vivo.sel);
   const rec = estado.vivo.grabando;
+  const npids = new Set(estado.vivo.canales.map((c) => c.pid)).size;
   el.innerHTML = `<h1>Datos en vivo</h1>
-    <div class="grupos" role="group" aria-label="Grupo de datos">${grupos.map((x) => `<button data-g="${x.id}" aria-pressed="${x.id === estado.vivo.grupo}">${esc(x.nombre)}</button>`).join('')}</div>
-    <div class="indicadores">${(g?.pids || []).map((p) => `<button class="indicador" data-pid="${p}" aria-pressed="${p === estado.vivo.sel}"><div class="nombre">${esc(PIDS[p].nombre)}</div><div><span class="valor" id="val-${p}">—</span><span class="unidad">${esc(PIDS[p].unidad)}</span></div><canvas id="spk-${p}" aria-hidden="true"></canvas></button>`).join('')}</div>
-    <div class="panel"><h3 id="sel-nombre">${esc(PIDS[estado.vivo.sel]?.nombre || '')}</h3><canvas class="grafica-grande" id="grafica"></canvas></div>
-    <div class="fila-btn">${rec ? `<span class="grabando">Grabando · <span id="rec-t">0</span> s</span><button class="btn" id="rec-parar">Parar y guardar en la OT</button>` : '<button class="btn sec" id="rec-ini">Grabar sesión (prueba de carretera)</button>'}</div>
-    <p class="peq suave">Cuantos menos datos a la vez, más rápido se refrescan. Con el adaptador real se leen unos 6-10 valores por segundo.</p>`;
+    <div class="grupos" role="group" aria-label="Grupo de datos">${grupos.map((x) => `<button data-g="${x.id}" aria-pressed="${x.id === estado.vivo.grupo}">${esc(x.nombre)} <span class="suave">${x.canales.length}</span></button>`).join('')}</div>
+    <div class="indicadores">${estado.vivo.canales.map((c) => `<button class="indicador" data-c="${esc(c.clave)}" aria-pressed="${c.clave === estado.vivo.sel}"><div class="nombre">${esc(c.nombre)}</div><div><span class="valor" id="val-${idCanal(c.clave)}">—</span><span class="unidad">${esc(c.unidad)}</span></div><canvas id="spk-${idCanal(c.clave)}" aria-hidden="true"></canvas></button>`).join('')}</div>
+    <div class="panel"><h3 id="sel-nombre">${esc(selC?.nombre || '')}</h3><canvas class="grafica-grande" id="grafica"></canvas></div>
+    <div class="fila-btn">${rec ? `<span class="grabando">Grabando · <span id="rec-t">0</span> s</span><button class="btn" id="rec-parar">Parar y guardar en la OT</button>` : '<button class="btn sec" id="rec-ini">Grabar sesión (prueba de carretera)</button>'}
+      <button class="btn sec" id="foto-ini">Foto de todos los datos</button></div>
+    <p class="peq suave">Este grupo pide ${npids} dato${npids === 1 ? '' : 's'} al coche en cada vuelta: cuantos menos, más rápido se refresca. Solo salen los datos que el coche dice que tiene.</p>
+    <div id="foto"></div>`;
   el.querySelectorAll('[data-g]').forEach((b) => b.onclick = () => { estado.vivo.grupo = b.dataset.g; vVivo(); });
-  el.querySelectorAll('[data-pid]').forEach((b) => b.onclick = () => { estado.vivo.sel = Number(b.dataset.pid); vVivo(); });
-  $('#rec-ini', el)?.addEventListener('click', () => { estado.vivo.grabando = { inicio: Date.now(), pids: g.pids, muestras: [] }; vVivo(); });
+  el.querySelectorAll('[data-c]').forEach((b) => b.onclick = () => { estado.vivo.sel = b.dataset.c; vVivo(); });
+  $('#rec-ini', el)?.addEventListener('click', () => { estado.vivo.grabando = { inicio: Date.now(), canales: estado.vivo.canales.slice(), muestras: [] }; vVivo(); });
   $('#rec-parar', el)?.addEventListener('click', pararGrabacion);
+  $('#foto-ini', el)?.addEventListener('click', fotoDatos);
+  if (estado.vivo.foto) pintarFoto();
   pintarVivo();
+}
+
+const idCanal = (clave) => clave.replace(/[^A-Za-z0-9_-]/g, '_');
+
+const NOMBRES_GRUPO = { basico: 'Básico', hibrido: 'Híbrido / eléctrico', adblue: 'AdBlue / SCR', escape: 'Escape / DPF', turbo: 'Turbo', diesel: 'Inyección y EGR', lambda: 'Sondas lambda', mezcla: 'Mezcla y aire', transmision: 'Par y cambio', contadores: 'Contadores', otros: 'Otros', obd: 'OBD' };
+
+async function fotoDatos() {
+  if (!estado.conectado) return toast('Conecta primero con el coche.');
+  const seguia = estado.vivo.activo;
+  estado.vivo.activo = false;
+  while (bucleEnMarcha) await new Promise((r) => setTimeout(r, 50));
+  const f = $('#foto');
+  try {
+    estado.vivo.foto = await estado.obd.fotoCompleta((m) => { if (f) f.innerHTML = `<p class="suave">${esc(m)}</p>`; });
+    estado.lectura.foto = estado.vivo.foto;
+    pintarFoto();
+  } catch (e) {
+    toast(`No se pudo leer: ${e.message}`);
+  } finally {
+    estado.vivo.activo = seguia;
+    if (seguia) bucleVivo();
+  }
+}
+
+function pintarFoto() {
+  const f = $('#foto');
+  const foto = estado.vivo.foto;
+  if (!f || !foto) return;
+  const fila = (d) => `<tr><td>${esc(d.nombre)}</td><td class="num">${d.texto ? esc(d.texto) : d.valor === null ? '—' : `${formatear(d.valor)} ${esc(d.unidad)}`}</td><td class="peq suave">${hexb(d.pid)}${d.ecu ? ` · ${esc(String(d.ecu))}` : ''}</td></tr>`;
+  f.innerHTML = `<div class="panel"><h3>Todos los datos OBD (${foto.grupos.reduce((n, g) => n + g.datos.length, 0)} valores de ${foto.pids} PID)</h3>
+    ${foto.grupos.map((g) => `<details${g.id === 'basico' ? ' open' : ''}><summary>${esc(NOMBRES_GRUPO[g.id] || g.id)} <span class="suave">${g.datos.length}</span></summary><table class="m06">${g.datos.map(fila).join('')}</table></details>`).join('')}
+    <p class="peq suave">Definiciones de los PID: base abierta OBDb (CC BY-SA 4.0).</p></div>`;
 }
 
 let bucleEnMarcha = false;
@@ -978,21 +1066,32 @@ async function bucleVivo() {
   bucleEnMarcha = true;
   try {
     while (estado.vivo.activo && estado.conectado) {
-      const sop = new Set(estado.lectura.soportados || []);
-      const g = GRUPOS_EN_VIVO.find((x) => x.id === estado.vivo.grupo);
-      const pids = (g?.pids || []).filter((p) => sop.has(p));
+      const canales = estado.vivo.canales || [];
+      const pids = [...new Set(canales.map((c) => c.pid))];
       if (!pids.length) break;
       const valores = await estado.obd.leerPids(pids);
       const t = Date.now();
+      const fila = {};
+      let quitar = false;
       for (const v of valores) {
-        const h = (estado.vivo.hist[v.pid] ||= []);
-        h.push(v.valor);
-        if (h.length > 120) h.shift();
+        const llegaron = new Set();
+        for (const s of v.senales || []) {
+          const clave = `${hexb(v.pid)}.${s.id}`;
+          llegaron.add(clave);
+          if (s.lista) continue;
+          const h = (estado.vivo.hist[clave] ||= []);
+          h.push(s.valor);
+          if (h.length > 120) h.shift();
+          fila[clave] = s.valor;
+        }
+        // Si el PID contesta pero dice que no tiene alguno de sus datos, ese dato se quita de la pantalla
+        if (!v.error) for (const c of canales) if (c.pid === v.pid && !llegaron.has(c.clave)) { estado.vivo.ausentes.add(c.clave); quitar = true; }
       }
       if (estado.vivo.grabando) {
-        estado.vivo.grabando.muestras.push({ t: t - estado.vivo.grabando.inicio, v: Object.fromEntries(valores.map((x) => [x.pid, x.valor])) });
+        estado.vivo.grabando.muestras.push({ t: t - estado.vivo.grabando.inicio, v: fila });
         if (estado.vivo.grabando.muestras.length > 20000) await pararGrabacion();
       }
+      if (quitar && estado.vista === 'vivo' && !estado.vivo.grabando) vVivo();
       pintarVivo();
       await new Promise((r) => setTimeout(r, 60));
     }
@@ -1005,16 +1104,17 @@ async function bucleVivo() {
 
 function pintarVivo() {
   if (estado.vista !== 'vivo') return;
-  for (const [pid, h] of Object.entries(estado.vivo.hist)) {
-    const val = $(`#val-${pid}`);
+  for (const [clave, h] of Object.entries(estado.vivo.hist)) {
+    const val = $(`#val-${idCanal(clave)}`);
     if (!val) continue;
     val.textContent = formatear(h[h.length - 1]);
-    const c = $(`#spk-${pid}`);
+    const c = $(`#spk-${idCanal(clave)}`);
     if (c) dibujarLinea(c, h.slice(-40));
   }
   const sel = estado.vivo.sel;
+  const selC = (estado.vivo.canales || []).find((c) => c.clave === sel);
   const gc = $('#grafica');
-  if (gc && estado.vivo.hist[sel]) dibujarLinea(gc, estado.vivo.hist[sel], { rejilla: true, etiquetas: true, unidad: PIDS[sel]?.unidad || '' });
+  if (gc && estado.vivo.hist[sel]) dibujarLinea(gc, estado.vivo.hist[sel], { rejilla: true, etiquetas: true, unidad: selC?.unidad || '' });
   const rt = $('#rec-t');
   if (rt && estado.vivo.grabando) rt.textContent = Math.round((Date.now() - estado.vivo.grabando.inicio) / 1000);
 }
@@ -1027,7 +1127,7 @@ async function pararGrabacion() {
     const r = await api.guardarSesion({
       lectura_id: estado.lecturaId, ot: estado.ot?.ot || null, matricula: estado.ot?.matricula || null, vin: estado.lectura.vehiculo?.vin,
       inicio: new Date(g.inicio).toISOString(), duracion_s: Math.round((Date.now() - g.inicio) / 1000),
-      pids: g.pids.map((p) => ({ pid: p, nombre: PIDS[p].nombre, unidad: PIDS[p].unidad })), muestras: g.muestras,
+      pids: g.canales.map((c) => ({ pid: c.clave, nombre: c.nombre, unidad: c.unidad })), muestras: g.muestras,
     });
     toast(`Sesión guardada (${g.muestras.length} muestras)${r.destino ? `: ${r.destino}` : ''}.`);
   } catch (e) {

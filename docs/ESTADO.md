@@ -87,8 +87,17 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - La app online usa la V200 y el Wi-Fi si «Iniciar Reyman Diag» está abierto en el portátil (`/estado` del enlace con CORS y red privada). Con internet el enlace abre la app online; sin internet, la de pruebas. Funciona en el portátil de José.
 - Pendiente: piloto en el taller (vLinker Bluetooth en tablet, V200 en portátil), comprobar guardado en OT, correo e informe al cliente, copia de la base `diag` a OneDrive.
 
+### 13. Base OBD completa (OBDb) → v0.4.7 (08/11/2026)
+- **Todos los PID del estándar** (205 PID, 1.095 datos) desde la base abierta OBDb «SAEJ1979» (CC BY-SA 4.0), copiada en `data/obdb/` y traducida al español con `scripts/generar-sae-pids.py` → `packages/obd-core/src/obd/sae-pids.js` (generado, no editar). Errata corregida: avance de inyección (PID 5D) con −210.
+- **Decodificador genérico** (`obd/senales.js`): bits desde el bit alto del byte A, escala, signo, «no disponible», listas de texto y los bits de «dato soportado» que trae cada PID (no se enseña lo que el coche no tiene). Presiones de rail en bar. `decodificarPid` mantiene la lista corta y añade `senales`.
+- **Datos en vivo por grupos** (Básico, Mezcla, Lambda, Inyección y EGR, Turbo, Escape/DPF, AdBlue/SCR, Híbrido, Par y cambio, Contadores) solo con lo soportado; un PID con varios datos se pide una vez. Botón **«Foto de todos los datos»** (una lectura de cada PID soportado, con la centralita que contesta), también en el informe del taller. La grabación guarda por dato (`0C.RPM`).
+- Quitado el PID 7C de la lista corta: estaba mal (el estándar lleva byte de soportados delante).
+- **Servicio 09 completo** (`obd/modo09.js`, Pre-ITV): calibraciones con su CVN, nº de serie y contadores de uso de los monitores (IUMPR, 09 08 gasolina / 09 0B diésel) con ratio y semáforo; en el informe del taller.
+- **OBD sobre UDS (SAE J1979-2)**: si el coche no contesta al 01 00, se prueba 22 F400 y se usa 22 F4xx (PID), 22 F8xx (infotipos), 19 42 33 (confirmadas/pendientes, con FTB), 19 55 33 (permanentes) y 14 FF FF 33 (borrar). Aún no: freeze frame (19 04) y modo 06 (22 F6xx). Simulador con `obdUds: true`.
+- Pendiente: probar la foto completa y el servicio 09 en el Kuga real y en un diésel con DPF/AdBlue.
+
 ### Pruebas
-- **78 pruebas automáticas.**
+- **91 pruebas automáticas.**
 
 ## Pendiente
 

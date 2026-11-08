@@ -72,7 +72,13 @@ export class Elm327 {
     this.info.version = (ati.match(/ELM327\s*v?[\d.]+\w*/i) || [ati.trim()])[0];
     for (const c of ['ATE0', 'ATL0', 'ATS1', 'ATH1', 'ATAT1', 'ATSP0']) await this.enviar(c);
     // Primera petición: fuerza la búsqueda de protocolo (puede tardar en protocolos antiguos)
-    const r = await this.enviar('0100', 20000);
+    let r = await this.enviar('0100', 20000);
+    if (/UNABLE TO CONNECT|NO DATA|ERROR/i.test(r)) {
+      // Coches con OBD sobre UDS (SAE J1979-2): no contestan al 01 00 pero sí al 22 F400 (CAN 11 bits 500k)
+      let u = await this.enviar('22F400', 5000).catch(() => '');
+      if (!/62\s*F4/i.test(u)) { await this.enviar('ATSP6'); u = await this.enviar('22F400', 5000).catch(() => ''); }
+      if (/62\s*F4/i.test(u)) { r = u; this.info.obdUds = true; }
+    }
     if (/UNABLE TO CONNECT|NO DATA|ERROR/i.test(r)) {
       const e = new Error(/UNABLE/i.test(r)
         ? 'El adaptador no consigue comunicar con el coche. Pon el contacto (o arranca) y vuelve a intentarlo.'

@@ -31,12 +31,25 @@ export function htmlInforme(l, { version = 'interno', taller = {}, logo = '' } =
   const seccion06 = m06 ? `<h2>Pruebas internas de los monitores (modo 06)</h2>${m06Malas.length
     ? `<table><thead><tr><th>Monitor</th><th>Prueba</th><th>Valor</th><th>Límites</th></tr></thead><tbody>${m06Malas.map((x) => `<tr><td>${esc(x.monitor)}</td><td>${esc(x.prueba)}</td><td>${esc(x.valor)} ${esc(x.unidad)}</td><td>${esc(x.min)} – ${esc(x.max)}</td></tr>`).join('')}</tbody></table>`
     : `<p>${m06.total} pruebas, todas dentro de límites.</p>`}` : '';
+  // Servicio 09 (solo informe del taller): calibraciones con CVN y monitores que casi nunca terminan
+  const m09 = !cliente && l.modo09?.ecus?.length ? l.modo09 : null;
+  const seccion09 = m09 ? (() => {
+    const cal = m09.ecus.flatMap((e) => (e.calibraciones || []).map((c) => `<tr><td>${esc(e.nombre || e.modulo)}</td><td>${esc(c.id || '—')}</td><td>${esc(c.cvn || '—')}</td></tr>`)).join('');
+    const bajos = m09.ecus.flatMap((e) => (e.ipt?.monitores || []).filter((x) => x.condiciones && x.ratio < 0.336).map((x) => `<li>${esc(x.nombre)}: ${x.completado} de ${x.condiciones} (${esc(x.ratio)})</li>`)).join('');
+    if (!cal && !bajos) return '';
+    return `<h2>Calibraciones y uso de los monitores</h2>${cal ? `<table><thead><tr><th>Centralita</th><th>Calibración</th><th>CVN</th></tr></thead><tbody>${cal}</tbody></table>` : ''}${bajos ? `<p>Monitores que terminan poco:</p><ul>${bajos}</ul>` : ''}`;
+  })() : '';
   const monitores = (rd.monitores || []).map((m) => `<li>${esc(m.nombre)}: <b>${m.estado === 'ok' ? 'completado' : 'pendiente'}</b></li>`).join('');
   const ff = l.freezeFrame?.dtc && !cliente
     ? `<h2>Condiciones al aparecer ${esc(l.freezeFrame.dtc.codigo)} (freeze frame)</h2><table><tbody>${l.freezeFrame.valores.map((x) => `<tr><td>${esc(x.nombre)}</td><td>${esc(x.valor)} ${esc(x.unidad)}</td></tr>`).join('')}</tbody></table>`
     : '';
-  const datos = !cliente && l.datos?.length
-    ? `<h2>Datos del motor</h2><table><tbody>${l.datos.filter((d) => d.valor !== null).map((x) => `<tr><td>${esc(x.nombre)}</td><td>${esc(x.texto || x.valor)} ${x.texto ? '' : esc(x.unidad)}</td></tr>`).join('')}</tbody></table>`
+  const foto = !cliente && l.foto?.grupos?.length
+    ? `<h2>Foto de todos los datos OBD</h2>${l.foto.grupos.map((g) => `<h3>${esc(GRUPOS_FOTO[g.id] || g.id)}</h3><table><tbody>${g.datos.filter((d) => d.valor !== null).map((x) => `<tr><td>${esc(x.nombre)}</td><td>${esc(x.texto || x.valor)} ${x.texto ? '' : esc(x.unidad)}</td></tr>`).join('')}</tbody></table>`).join('')}<p class="peq">Definiciones de los PID: base abierta OBDb (CC BY-SA 4.0).</p>`
+    : '';
+  // Un PID puede traer varios datos (p. ej. tensión y corriente de la batería híbrida): se muestran todos
+  const filasDatos = (l.datos || []).flatMap((d) => (d.senales?.length > 1 ? d.senales : [d])).filter((d) => d.valor !== null && d.valor !== undefined);
+  const datos = !cliente && filasDatos.length
+    ? `<h2>Datos del motor</h2><table><tbody>${filasDatos.map((x) => `<tr><td>${esc(x.nombre)}</td><td>${esc(x.texto || x.valor)} ${x.texto ? '' : esc(x.unidad)}</td></tr>`).join('')}</tbody></table>`
     : '';
   const ia = l.ia?.texto ? `<h2>${cliente ? 'Valoración del taller' : 'Diagnóstico asistido (IA)'}</h2><p class="pre">${esc(l.ia.texto)}</p>` : '';
   const explicacion = cliente
@@ -79,11 +92,13 @@ ${explicacion}
 <table><thead><tr><th>Código</th><th>Descripción</th><th>Estado</th>${cliente ? '' : '<th>Centralita</th>'}</tr></thead><tbody>${filasAv}</tbody></table>
 ${seccionUds}
 ${seccionHv}
-${seccion06}
+${seccion06}${seccion09}
 <h2>Estado para la ITV (emisiones)</h2>
 ${rd.semaforo ? `<p><span class="sem ${rd.semaforo}">${esc(SEMAFORO[rd.semaforo])}</span></p><p>${esc(rd.motivo || '')}</p>${cliente ? '' : `<ul>${monitores}</ul>`}` : '<p>No disponible.</p>'}
-${ff}${datos}${ia}
+${ff}${datos}${foto}${ia}
 ${l.borrado ? `<h2>Borrado de averías</h2><p>Averías borradas el ${fmtFecha(l.borrado.fecha)}${cliente ? '' : ` por ${esc(l.borrado.usuario || '')}`}.</p>` : ''}
 <footer>${esc(taller.nombre || 'Talleres Reyman, S.L.')} · Arganda del Rey (Madrid) · talleresreyman.com${cliente ? '' : ` · Adaptador: ${esc(l.adaptador?.version || '')} · Protocolo: ${esc(l.adaptador?.protocolo?.nombre || '')}`}</footer>
 </body></html>`;
 }
+
+const GRUPOS_FOTO = { basico: 'Básico', hibrido: 'Híbrido / eléctrico', adblue: 'AdBlue / SCR', escape: 'Escape / DPF', turbo: 'Turbo', diesel: 'Inyección y EGR', lambda: 'Sondas lambda', mezcla: 'Mezcla y aire', transmision: 'Par y cambio', contadores: 'Contadores', otros: 'Otros' };

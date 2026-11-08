@@ -3,6 +3,8 @@
 // (motor 7E8 y cambio 7E9), averías, freeze frame, monitores y datos en vivo que varían en el tiempo.
 // Sirve para probar la app sin adaptador y para los tests del parser.
 
+import { codificarSenales } from '../obd/senales.js';
+
 const hx = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 
 export const COCHES_SIM = {
@@ -118,7 +120,7 @@ export function crearSimulador(opciones = {}) {
       0x2f: 54, 0x30: estado.borradas ? 0 : 38, 0x31: estado.borradas ? 0 : 1260, 0x33: 94, 0x3c: 380 + rpm / 10,
       0x42: tensionActual(), 0x44: 1, 0x46: 19, 0x4d: estado.borradas ? 0 : 640, 0x4e: estado.borradas ? 0 : 5200,
       0x51: coche.combustible, 0x59: diesel ? 300 + rpm / 3 : 120, 0x5c: Math.max(0, temp - 5), 0x5e: rpm / 400,
-      0x7c: diesel ? 290 + rpm / 8 : 0, 0xa6: coche.km,
+      0xa6: coche.km,
     };
     return v[pid];
   }
@@ -136,7 +138,7 @@ export function crearSimulador(opciones = {}) {
       case 0x10: return w(valor * 100);
       case 0x1f: case 0x21: case 0x31: case 0x4d: case 0x4e: return w(valor);
       case 0x23: case 0x59: return w(valor * 10);
-      case 0x3c: case 0x7c: return w((valor + 40) * 10);
+      case 0x3c: return w((valor + 40) * 10);
       case 0x42: return w(valor * 1000);
       case 0x44: return w((valor * 65536) / 2);
       case 0x5e: return w(valor * 20);
@@ -145,7 +147,29 @@ export function crearSimulador(opciones = {}) {
     }
   }
 
-  const SOPORTADOS = [0x01, 0x04, 0x05, 0x06, 0x07, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x1c, 0x1f, 0x20, 0x21, 0x23, 0x2c, 0x2f, 0x30, 0x31, 0x33, 0x3c, 0x40, 0x42, 0x44, 0x46, 0x4d, 0x4e, 0x51, 0x59, 0x5c, 0x5e, 0x60, 0x7c, 0x80, 0xa0, 0xa6];
+  // PID de la base completa (turbo, DPF, AdBlue, híbrido) que el simulador da según el coche
+  function senalesSim(pid) {
+    const t = (Date.now() - estado.t0) / 1000;
+    const rpm = vivo(0x0c);
+    const hibrido = coche.combustible === 17;
+    const tabla = diesel ? {
+      0x70: { BP_A_CMD: 100 + rpm / 20, BP_A_ACT: 98 + rpm / 20 + 3 * Math.sin(t) },
+      0x71: { VGT_A_CMD: 40 + rpm / 80, VGT_A_ACT: 39 + rpm / 80 },
+      0x74: { TCA_RPM: rpm * 40 },
+      0x7a: { DPF1_DP: 2.1 + rpm / 1500 },
+      0x7c: { DPF1_INT: 290 + rpm / 8, DPF1_OUTT: 270 + rpm / 9 },
+      0x8b: { PF_REGEN_STAT: 0, PF_REGEN_PCT: 37, PF_REGEN_AVGT: 512, PF_REGEN_AVGD: 412 },
+      0x9b: { DEF_CON: 32.4, DEF_T: 18, DEF_LVL: 61, DEF_TYPE: 3 },
+    } : hibrido ? {
+      0x9a: { HEV_BATT_V: 223.5 + 4 * Math.sin(t / 3), HEV_BATT_A: 12 * Math.sin(t / 5), HEV_MODE: 0 },
+      0xb2: { BAT_SOH: 97 },
+    } : {};
+    const v = tabla[pid];
+    return v ? codificarSenales(pid, v) : null;
+  }
+
+  const BASE_SOPORTADOS = [0x01, 0x04, 0x05, 0x06, 0x07, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x1c, 0x1f, 0x20, 0x21, 0x23, 0x2c, 0x2f, 0x30, 0x31, 0x33, 0x3c, 0x40, 0x42, 0x44, 0x46, 0x4d, 0x4e, 0x51, 0x59, 0x5c, 0x5e, 0x60, 0x80, 0xa0, 0xa6];
+  const SOPORTADOS = [...BASE_SOPORTADOS, ...[0x70, 0x71, 0x74, 0x7a, 0x7c, 0x8b, 0x9a, 0x9b, 0xb2].filter((p) => senalesSim(p))].sort((a, b) => a - b);
 
   function mapaSoportados(base) {
     const out = [0, 0, 0, 0];
@@ -191,8 +215,44 @@ export function crearSimulador(opciones = {}) {
     return out;
   }
 
+  // OBD sobre UDS (SAE J1979-2): los mismos datos por 22 F4xx y las averías por 19 42 / 19 55
+  function responderObdUds(bytes) {
+    const [servicio, b1, b2] = bytes;
+    const neg = (nrc) => tramar('7E8', [0x7f, servicio, nrc]);
+    if (servicio === 0x22 && b1 === 0xf4) {
+      const r = respuestasClasicas([0x01, b2]).filter(([, p]) => p[0] === 0x41).map(([ecu, p]) => [ecu, [0x62, 0xf4, ...p.slice(1)]]);
+      return r.length ? r.flatMap(([e, p]) => tramar(e, p)) : neg(0x31);
+    }
+    if (servicio === 0x22 && b1 === 0xf8) {
+      // En J1979-2 los infotipos van sin el byte de «nº de elementos»
+      const r = respuestasClasicas([0x09, b2]).filter(([, p]) => p[0] === 0x49).map(([ecu, p]) => [ecu, [0x62, 0xf8, p[1], ...p.slice(b2 % 0x20 === 0 ? 2 : 3)]]);
+      return r.length ? r.flatMap(([e, p]) => tramar(e, p)) : neg(0x31);
+    }
+    if (servicio === 0x19 && (b1 === 0x42 || b1 === 0x55) && b2 === 0x33) {
+      const mascara = b1 === 0x55 ? null : bytes[3];
+      const lista = b1 === 0x55 ? coche.averias.permanente : mascara & 0x08 ? coche.averias.confirmada : coche.averias.pendiente;
+      const estadoDtc = b1 === 0x55 ? 0x08 : mascara;
+      const regs = lista.flatMap((c) => (b1 === 0x55 ? [...dtcABytes(c), 0x00, estadoDtc] : [0x20, ...dtcABytes(c), 0x00, estadoDtc]));
+      const cab = b1 === 0x55 ? [0x59, 0x55, 0x33, 0xff, 0x04] : [0x59, 0x42, 0x33, 0xff, 0xe0, 0x04];
+      return tramar('7E8', [...cab, ...regs]);
+    }
+    if (servicio === 0x14 && b1 === 0xff && b2 === 0xff && bytes[3] === 0x33) { estado.borradas = true; coche.averias = { confirmada: [], pendiente: [], permanente: coche.averias.permanente }; return tramar('7E8', [0x54]); }
+    return null;
+  }
+
   function responderObd(cmd) {
     const bytes = cmd.match(/.{2}/g).map((h) => parseInt(h, 16));
+    if (opciones.obdUds) {
+      const u = responderObdUds(bytes);
+      if (u) return u;
+      return ['NO DATA']; // el servicio 01-0A clásico ya no contesta
+    }
+    const r = respuestasClasicas(bytes);
+    if (!r.length) return ['NO DATA'];
+    return r.flatMap(([ecu, p]) => tramar(ecu, p));
+  }
+
+  function respuestasClasicas(bytes) {
     const servicio = bytes[0];
     const r = []; // [ecu, payload]
     const motor = (p) => r.push(['7E8', p]);
@@ -215,12 +275,12 @@ export function crearSimulador(opciones = {}) {
         motor([0x41, 0x1c, 0x06]);
       } else {
         const v = vivo(pid);
-        const enc = v === undefined ? null : codificarPid(pid, v);
+        const enc = v === undefined ? senalesSim(pid) : codificarPid(pid, v);
         if (enc && SOPORTADOS.includes(pid)) motor([0x41, pid, ...enc]);
       }
     } else if (servicio === 0x02) {
       const pid = bytes[1];
-      if (!coche.freeze || estado.borradas) return [];
+      if (!coche.freeze || estado.borradas) return r;
       if (pid === 0x02) motor([0x42, 0x02, 0x00, ...dtcABytes(coche.freeze.dtc)]);
       else if (coche.freeze.valores[pid] !== undefined) motor([0x42, pid, 0x00, ...codificarPid(pid, coche.freeze.valores[pid])]);
     } else if ([0x03, 0x07, 0x0a].includes(servicio)) {
@@ -259,10 +319,12 @@ export function crearSimulador(opciones = {}) {
         motor([0x49, 0x0a, 0x01, ...[...'ECM-EngineControl'].map((c) => c.charCodeAt(0)), 0, 0, 0]);
         cambio([0x49, 0x0a, 0x01, ...[...'TCM-TransmisCtrl'].map((c) => c.charCodeAt(0)), 0, 0, 0, 0]);
       } else if (pid === 0x04) motor([0x49, 0x04, 0x01, ...[...'04L906056KT  4521'].map((c) => c.charCodeAt(0)).slice(0, 16)]);
-      else if (pid === 0x00) motor([0x49, 0x00, 0x55, 0x40, 0x00, 0x00]);
+      else if (pid === 0x06) motor([0x49, 0x06, 0x01, 0x5a, 0x3c, 0x91, 0xe2]);
+      else if (pid === 0x08 && !diesel) motor([0x49, 0x08, 0x14, ...[412, 980, 120, 410, 0, 0, 260, 410, 0, 0, 98, 410, 0, 0, 30, 410, 140, 410, 0, 0].flatMap((x) => [x >> 8, x & 0xff])]);
+      else if (pid === 0x0b && diesel) motor([0x49, 0x0b, 0x12, ...[380, 900, 0, 0, 210, 380, 0, 0, 30, 380, 150, 380, 300, 380, 280, 380, 310, 380].flatMap((x) => [x >> 8, x & 0xff])]);
+      else if (pid === 0x00) motor([0x49, 0x00, 0x55, diesel ? 0x60 : 0x40, 0x00, 0x00]);
     }
-    if (!r.length) return ['NO DATA'];
-    return r.flatMap(([ecu, p]) => tramar(ecu, p));
+    return r;
   }
 
   // Diagnosis UDS de una centralita concreta (ATSH/ATCRA)

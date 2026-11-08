@@ -8,7 +8,7 @@
 //   muestras [{ t (ms desde inicio), v {pid: valor}, tension? }],
 //   eventos [{ t, tipo: 'dtc'|'boton'|'tension'|'nota', detalle }], ventana? {antesS, despuesS} }
 
-import { PIDS } from './obd/pids.js';
+import { infoPid } from './obd/pids.js';
 
 export const FORMATO = 'reyman-grabacion';
 export const VERSION = 1;
@@ -54,7 +54,7 @@ export function resumen(g) {
   const claves = [...g.pids, ...(g.muestras.some((m) => m.tension !== undefined) ? ['tension'] : [])];
   return claves.map((k) => {
     const s = serie(g, k).map((x) => x.valor);
-    const def = k === 'tension' ? { nombre: 'Tensión batería', unidad: 'V' } : PIDS[k] || { nombre: `PID ${k}`, unidad: '' };
+    const def = k === 'tension' ? { nombre: 'Tensión batería', unidad: 'V' } : infoPid(Number(k));
     if (!s.length) return { clave: k, nombre: def.nombre, unidad: def.unidad, n: 0 };
     return { clave: k, nombre: def.nombre, unidad: def.unidad, n: s.length, min: Math.min(...s), max: Math.max(...s), media: s.reduce((a, b) => a + b, 0) / s.length };
   }).filter(Boolean);

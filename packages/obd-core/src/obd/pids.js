@@ -1,6 +1,10 @@
 // Reyman Diag · PIDs estándar del modo 01 (SAE J1979 / ISO 15031-5)
 // Cada PID: nombre en español, unidad, número de bytes y fórmula sobre los bytes A, B, C, D...
 // Las fórmulas son las públicas del estándar.
+// Además de esta lista corta (la de siempre, con rangos para las gráficas), todos los PID del estándar
+// se decodifican bit a bit con sae-pids.js (base abierta OBDb, CC BY-SA 4.0): ver senales.js.
+
+import { decodificarSenales, bytesDePid, senalesNumericas, SAE_PIDS } from './senales.js';
 
 const u8 = (b) => b[0];
 const pct = (x) => (x * 100) / 255;
@@ -61,7 +65,6 @@ export const PIDS = {
   0x62: { nombre: 'Par real del motor', unidad: '%', bytes: 1, f: (b) => u8(b) - 125, min: -125, max: 130 },
   0x63: { nombre: 'Par de referencia del motor', unidad: 'Nm', bytes: 2, f: (b) => w(b), min: 0, max: 65535 },
   0x70: { nombre: 'Presión de sobrealimentación (comandada A)', unidad: 'kPa', bytes: 10, f: (b) => w(b, 1) / 32, min: 0, max: 400 },
-  0x7c: { nombre: 'Temperatura filtro de partículas (DPF)', unidad: '°C', bytes: 2, f: (b) => w(b) / 10 - 40, min: -40, max: 1000 },
   0xa6: { nombre: 'Cuentakilómetros', unidad: 'km', bytes: 4, f: (b) => ((b[0] * 2 ** 24) + (b[1] << 16) + (b[2] << 8) + b[3]) / 10, min: 0, max: 2000000 },
 };
 
@@ -77,22 +80,88 @@ export const COMBUSTIBLE = {
 export const GRUPOS_EN_VIVO = [
   { id: 'basico', nombre: 'Básico', pids: [0x0c, 0x0d, 0x05, 0x04, 0x42, 0x0f] },
   { id: 'mezcla', nombre: 'Mezcla y aire', pids: [0x06, 0x07, 0x10, 0x0b, 0x11, 0x44] },
-  { id: 'diesel', nombre: 'Diésel', pids: [0x23, 0x59, 0x0b, 0x2c, 0x7c, 0x5e] },
-  { id: 'temperaturas', nombre: 'Temperaturas', pids: [0x05, 0x0f, 0x5c, 0x46, 0x3c, 0x7c] },
+  { id: 'diesel', nombre: 'Diésel', pids: [0x23, 0x59, 0x0b, 0x2c, 0x5e] },
+  { id: 'temperaturas', nombre: 'Temperaturas', pids: [0x05, 0x0f, 0x5c, 0x46, 0x3c] },
 ];
 
-/** Decodifica un PID del modo 01 a partir de sus bytes de datos. */
+/** Nombre y unidad de un PID (lista corta o, si no está, la base completa). */
+export function infoPid(pid) {
+  if (PIDS[pid]) return { nombre: PIDS[pid].nombre, unidad: PIDS[pid].unidad };
+  const s = SAE_PIDS[pid] && (senalesNumericas(pid)[0] || SAE_PIDS[pid].s.find((x) => !x.oculta));
+  return s ? { nombre: s.n, unidad: s.u || '' } : { nombre: `PID 0x${hex(pid)}`, unidad: '' };
+}
+
+/** Bytes de datos de la respuesta de un PID. */
+export function longitudPid(pid) {
+  return SAE_PIDS[pid] ? bytesDePid(pid) : PIDS[pid]?.bytes || 4;
+}
+
+/**
+ * Decodifica un PID del modo 01/02 a partir de sus bytes de datos.
+ * Devuelve el valor principal (pid, nombre, unidad, valor, texto) y, en `senales`, todos los datos que trae el PID.
+ */
 export function decodificarPid(pid, bytes) {
+  const senales = decodificarSenales(pid, bytes);
   const def = PIDS[pid];
-  if (!def) return { pid, nombre: `PID 0x${hex(pid)}`, valor: null, bruto: bytes.map(hex).join(' ') };
-  const valor = def.f(bytes);
-  return {
-    pid,
-    nombre: def.nombre,
-    unidad: def.unidad,
-    valor: Math.round(valor * 100) / 100,
-    texto: def.texto ? def.texto(valor) : null,
-  };
+  if (def) {
+    const valor = def.f(bytes);
+    return {
+      pid,
+      nombre: def.nombre,
+      unidad: def.unidad,
+      valor: Number.isFinite(valor) ? Math.round(valor * 100) / 100 : null,
+      texto: def.texto ? def.texto(valor) : null,
+      senales,
+    };
+  }
+  if (senales.length) {
+    const p = senales.find((x) => !x.lista && x.valor !== null) || senales.find((x) => x.valor !== null) || senales[0];
+    return { pid, nombre: p.nombre, unidad: p.unidad, valor: p.lista ? p.valor : p.valor, texto: p.texto, senales };
+  }
+  return { pid, nombre: `PID 0x${hex(pid)}`, valor: null, bruto: bytes.map(hex).join(' '), senales: [] };
+}
+
+// ---------------------------------------------------------------------------
+// Grupos de datos en vivo a partir de la base completa
+// ---------------------------------------------------------------------------
+const CLASES = [
+  ['basico', 'Básico', /^(RPM|VSS|ECT|ECT_\d|LOAD_PCT|VPWR|IAT|EOT|AAT|TP|APP_[DR]|FLI|BARO|RUNTM)$/],
+  ['hibrido', 'Híbrido / eléctrico', /^(HEV_|HVES|BAT_SO|EM[A-H]_|SOC[ER]|CALCULATED_ESS|REMAINING_ESS|INIT_ESS|FC_)/],
+  ['adblue', 'AdBlue / SCR', /^(REAG_|DEF|SCR_NH3|NWI_TIME)/],
+  ['escape', 'Escape / DPF', /^(EGT|DPF|CATEMP|PF_|NOX|PM\d|EXH_RATE|HC_INJ|AFT_FP|MST)/],
+  ['turbo', 'Turbo', /^(BP_|VGT_|WG_|TC[AB]_|CACT_|EP_)/],
+  ['diesel', 'Inyección y EGR', /^(FRP|ICP|FRT|FUEL_TIMING|FUEL_RATE|VFUEL_RATE|CYL_RATE|EGR|IAF_|AIR_FL_TGT|LFP_|FUELSYS[AB])/],
+  ['lambda', 'Sondas lambda', /^(O2S|LAMBDA|SHRTFT\d\d|STSO2|LGSO2)/],
+  ['mezcla', 'Mezcla y aire', /^(SHRTFT|LONGFT|MAF|MAP|EQ_RAT|TP_|TAC_|SPARKADV|LOAD_ABS|IAT_|FP$|EVAP|ALCH)/],
+  ['transmision', 'Par y cambio', /^(TQ_|GEAR_|V_SET)/],
+  ['contadores', 'Contadores', /(TIME|DIST|ODO|WARM_UPS|NUMPSA)/],
+];
+
+/** Grupo de una señal por su identificador. */
+export function grupoDeSenal(id) {
+  for (const [g, , re] of CLASES) if (re.test(id)) return g;
+  return 'otros';
+}
+
+/**
+ * Grupos para la pantalla de datos en vivo, solo con lo que el coche soporta.
+ * Cada canal: { clave: '0C.RPM', pid, id, nombre, unidad, min, max }.
+ */
+export function gruposEnVivo(soportados) {
+  const sop = new Set(soportados || []);
+  const grupos = new Map(CLASES.map(([id, nombre]) => [id, { id, nombre, canales: [] }]));
+  grupos.set('otros', { id: 'otros', nombre: 'Otros', canales: [] });
+  for (const pid of [...sop].sort((a, b) => a - b)) {
+    if (pid % 0x20 === 0 || pid === 0x01 || pid === 0x41 || pid === 0x02) continue; // mapas y monitores van aparte
+    for (const s of senalesNumericas(pid)) {
+      const g = grupos.get(grupoDeSenal(s.id));
+      g.canales.push({ clave: `${hex(pid)}.${s.id}`, pid, id: s.id, nombre: s.n, unidad: s.u || '', min: s.min, max: s.max });
+    }
+  }
+  // «Básico» primero y en el orden de siempre
+  const orden = ['RPM', 'VSS', 'ECT', 'LOAD_PCT', 'VPWR', 'IAT', 'EOT', 'AAT', 'TP', 'APP_D', 'FLI'];
+  grupos.get('basico').canales.sort((a, b) => (orden.indexOf(a.id) + 1 || 99) - (orden.indexOf(b.id) + 1 || 99));
+  return [...grupos.values()].filter((g) => g.canales.length);
 }
 
 /** Decodifica los mapas de PIDs soportados (PIDs 00, 20, 40...). Devuelve la lista de PIDs. */
