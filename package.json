@@ -1,0 +1,28 @@
+{
+  "name": "reyman-diag",
+  "version": "0.4.3",
+  "private": true,
+  "type": "module",
+  "description": "Reyman Diag · diagnosis OBD de Talleres Reyman, enlazada con App Reyman",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js",
+    "demo": "node scripts/build-demo.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/static": "^10.1.8",
+    "fastify": "^5.12.7",
+    "pdfkit": "^0.17.2",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  },
+  "workspaces": [
+    "packages/*"
+  ]
+}

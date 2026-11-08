@@ -1,0 +1,17 @@
+{
+  "name": "Reyman Diag",
+  "short_name": "Reyman Diag",
+  "description": "Diagnosis OBD de Talleres Reyman",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#e4e8ed",
+  "theme_color": "#143f7a",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

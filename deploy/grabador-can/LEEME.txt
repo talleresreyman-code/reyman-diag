@@ -1,0 +1,18 @@
+﻿GRABADOR DEL BUS CAN (cable en Y + segunda interfaz J2534)
+==========================================================
+
+Para qué: grabar todo lo que la tablet Autel le pregunta al coche y lo que contestan
+las centralitas. Así vemos qué direcciones y qué datos usa Autel (ABS, airbag, cuadro...).
+Esta interfaz SOLO ESCUCHA: no envía nada al coche.
+
+1. Cable en Y en la toma OBD. En una salida la V200 (con la tablet MS919), en la otra
+   la interfaz grande, conectada al portátil por USB.
+2. Cierra la ventana negra de Reyman Diag si está abierta.
+3. Doble clic en "Grabar bus CAN". Elige el número de la interfaz grande.
+   Velocidad: Intro (500). 29 bits: Intro (no). Pines: Intro (6 y 14).
+   Antes de grabar, la ventana dice la tensión que ve la interfaz: debe ser 12-15 V.
+4. Contacto puesto. Intro para empezar a grabar.
+5. En la tablet: escaneo automático completo, entra en ABS, airbag y cuadro y lee averías
+   e información de la centralita. Si quieres, datos en vivo de la batería híbrida 30 s.
+6. Intro para parar. El archivo bus-can-....csv queda en esta carpeta. Avisa a Claude.
+   Si sale 0 tramas, haz una foto de la ventana negra antes de cerrarla.

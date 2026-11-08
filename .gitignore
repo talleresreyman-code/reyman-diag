@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.log
+dist/
+apps/cliente/www/
+apps/cliente/dist/
+apps/cliente/android/
+apps/cliente/ios/

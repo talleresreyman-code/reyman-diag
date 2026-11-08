@@ -1,0 +1,280 @@
+/* Reyman Diag · estilos
+   Idea: herramienta de foso. Se usa con las manos sucias, con luz de nave y a un brazo de distancia:
+   botones grandes, cifras grandes con números tabulares, el código de avería como una placa troquelada.
+   Paleta: azul Reyman del logotipo, gris aluminio y el semáforo de la ITV. */
+
+:root {
+  --azul: #1d57a5;
+  --azul-hondo: #143f7a;
+  --asfalto: #232a33;
+  --aluminio: #e4e8ed;
+  --chapa: #ffffff;
+  --gris: #66717f;
+  --linea: #c9d0d8;
+  --verde: #1e8a4c;
+  --ambar: #b97f00;
+  --ambar-fondo: #fff3d1;
+  --rojo: #c4302a;
+  --rojo-fondo: #fde8e6;
+  --verde-fondo: #e3f4ea;
+  --texto: var(--asfalto);
+  --fondo: var(--aluminio);
+  --superficie: var(--chapa);
+  --sombra: 0 1px 0 rgba(35, 42, 51, 0.08);
+  --radio: 10px;
+  --fuente: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --fuente-c: 'Barlow Semi Condensed', 'Barlow', system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --texto: #e9edf2; --fondo: #1a1f26; --superficie: #242b34; --linea: #3a4450; --gris: #9aa6b4;
+    --azul: #5b93df; --azul-hondo: #9cc1f2; --verde: #4cc283; --ambar: #f0b72f; --rojo: #f0645d;
+    --ambar-fondo: #3a3017; --rojo-fondo: #3d2422; --verde-fondo: #1e3528; color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --texto: #e9edf2; --fondo: #1a1f26; --superficie: #242b34; --linea: #3a4450; --gris: #9aa6b4;
+  --azul: #5b93df; --azul-hondo: #9cc1f2; --verde: #4cc283; --ambar: #f0b72f; --rojo: #f0645d;
+  --ambar-fondo: #3a3017; --rojo-fondo: #3d2422; --verde-fondo: #1e3528; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--fuente);
+  font-size: 17px;
+  line-height: 1.45;
+  color: var(--texto);
+  background: var(--fondo);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  min-height: 100dvh;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- Barra superior ---------- */
+.barra {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  background: var(--azul-hondo);
+  color: #fff;
+}
+:root[data-theme='dark'] .barra, .barra { background: #143f7a; }
+.barra .marca { font-family: var(--fuente-c); font-weight: 700; font-size: 20px; letter-spacing: 0.01em; }
+.barra .marca small { font-weight: 500; opacity: 0.75; font-size: 15px; margin-left: 4px; }
+.barra .estado { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.punto { width: 10px; height: 10px; border-radius: 50%; background: #8a96a3; flex: none; }
+.punto.on { background: #4cd38a; box-shadow: 0 0 0 3px rgba(76, 211, 138, 0.25); }
+.punto.busy { background: #ffc94d; }
+.barra .usuario { font-size: 14px; opacity: 0.85; white-space: nowrap; }
+.barra .estado span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 52vw; }
+@media (max-width: 520px) { .barra .usuario { display: none; } }
+
+/* ---------- Contenedor ---------- */
+main { max-width: 760px; margin: 0 auto; padding-block: 16px 112px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.vista[hidden] { display: none; }
+h1, h2, h3 { font-family: var(--fuente-c); line-height: 1.15; margin: 0; }
+h1 { font-size: 28px; font-weight: 700; }
+h2 { font-size: 22px; font-weight: 700; margin: 24px 0 10px; }
+h3 { font-size: 18px; font-weight: 600; }
+p { margin: 6px 0; }
+.suave { color: var(--gris); }
+.peq { font-size: 14px; }
+
+.panel {
+  background: var(--superficie);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  padding: 16px;
+  margin: 12px 0;
+}
+
+/* ---------- Botones ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; padding: 0 20px;
+  border-radius: 8px; border: 2px solid transparent;
+  font-weight: 600; font-size: 17px; cursor: pointer;
+  background: var(--azul); color: #fff;
+  text-decoration: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn.sec { background: transparent; color: var(--azul); border-color: var(--azul); }
+.btn.peligro { background: var(--rojo); }
+.btn.fantasma { background: transparent; color: var(--texto); border-color: var(--linea); }
+.btn.ancho { width: 100%; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.fila-btn { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.fila-btn > .btn { flex: 1 1 160px; }
+
+/* ---------- Conexión ---------- */
+.conexion-intro { margin: 8px 0 18px; }
+.opciones-conexion { display: grid; gap: 10px; }
+.opcion {
+  display: grid; grid-template-columns: 44px 1fr; gap: 4px 14px; align-items: center;
+  text-align: left; padding: 16px; min-height: 76px;
+  background: var(--superficie); border: 2px solid var(--linea); border-radius: var(--radio);
+  cursor: pointer;
+}
+.opcion:hover { border-color: var(--azul); }
+.opcion svg { grid-row: span 2; width: 36px; height: 36px; color: var(--azul); }
+.opcion strong { font-size: 18px; }
+.opcion span { font-size: 14px; color: var(--gris); }
+.opcion[disabled] { opacity: 0.55; cursor: not-allowed; }
+.registro {
+  margin-top: 16px; max-height: 160px; overflow: auto;
+  font-size: 13px; line-height: 1.35; color: var(--gris);
+  white-space: pre-wrap; background: var(--superficie); border: 1px dashed var(--linea); border-radius: 8px; padding: 10px;
+}
+.progreso { display: flex; align-items: center; gap: 12px; font-weight: 600; }
+.giro { width: 22px; height: 22px; border: 3px solid var(--linea); border-top-color: var(--azul); border-radius: 50%; animation: giro 0.8s linear infinite; }
+@keyframes giro { to { transform: rotate(360deg); } }
+
+/* ---------- Vehículo ---------- */
+.vehiculo-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.matricula {
+  display: inline-flex; align-items: stretch; border: 2px solid var(--asfalto); border-radius: 6px; overflow: hidden;
+  font-family: var(--fuente-c); font-weight: 700; font-size: 22px; letter-spacing: 0.04em; background: #fff; color: #1b1b1b;
+}
+.matricula::before { content: 'E'; background: #1f4bb3; color: #fff; font-size: 12px; padding: 14px 5px 2px; letter-spacing: 0; }
+.matricula span { padding: 2px 10px; }
+.datos-vehiculo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; margin-top: 14px; }
+.dato dt { font-size: 14px; color: var(--gris); }
+.dato dd { margin: 0; font-weight: 600; font-size: 17px; word-break: break-all; }
+.ot-propuesta { border-left: 4px solid var(--azul); }
+
+/* ---------- Resumen ---------- */
+.resumen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.resumen .celda { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio); padding: 12px; text-align: left; cursor: pointer; }
+.resumen .num { font-family: var(--fuente-c); font-size: 34px; font-weight: 700; line-height: 1; }
+.resumen .celda.rojo .num { color: var(--rojo); }
+.resumen .celda.ambar .num { color: var(--ambar); }
+.resumen .celda.verde .num { color: var(--verde); }
+
+/* ---------- Averías: el código como placa troquelada ---------- */
+.averia {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; align-items: start;
+  background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio);
+  padding: 14px; margin: 10px 0;
+}
+.placa {
+  font-family: var(--fuente-c); font-weight: 700; font-size: 26px; line-height: 1;
+  letter-spacing: 0.03em; padding: 10px 10px 8px; border-radius: 6px; min-width: 96px; text-align: center;
+  color: #fff; background: var(--rojo);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.averia.pendiente .placa { background: var(--ambar); color: #241a00; }
+.averia.permanente .placa { background: #4a5563; }
+.averia .desc { font-weight: 600; font-size: 17px; }
+.averia .meta { font-size: 14px; color: var(--gris); }
+.etiqueta { display: inline-block; font-size: 13px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--fondo); border: 1px solid var(--linea); margin-right: 4px; }
+.etiqueta.fab { border-color: var(--ambar); }
+.vacio { text-align: center; padding: 28px 12px; color: var(--gris); }
+.vacio strong { display: block; color: var(--verde); font-size: 20px; font-family: var(--fuente-c); margin-bottom: 4px; }
+
+/* ---------- Pre-ITV ---------- */
+.semaforo { display: flex; gap: 16px; align-items: center; padding: 16px; border-radius: var(--radio); border: 2px solid; }
+.semaforo .luz { width: 54px; height: 54px; border-radius: 50%; flex: none; }
+.semaforo.verde { background: var(--verde-fondo); border-color: var(--verde); }
+.semaforo.verde .luz { background: var(--verde); }
+.semaforo.amarillo { background: var(--ambar-fondo); border-color: var(--ambar); }
+.semaforo.amarillo .luz { background: var(--ambar); }
+.semaforo.rojo { background: var(--rojo-fondo); border-color: var(--rojo); }
+.semaforo.rojo .luz { background: var(--rojo); }
+.semaforo h3 { font-size: 22px; }
+.monitores { list-style: none; padding: 0; margin: 0; }
+.monitores li { display: flex; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--linea); }
+.monitores li:last-child { border-bottom: 0; }
+.ok { color: var(--verde); font-weight: 600; }
+.pend { color: var(--ambar); font-weight: 600; }
+
+/* ---------- Datos en vivo ---------- */
+.grupos { display: flex; gap: 8px; overflow-x: auto; padding: 4px 0; margin-top: 12px; }
+.grupos button { flex: none; min-height: 44px; padding: 0 16px; border-radius: 99px; border: 2px solid var(--linea); background: var(--superficie); font-weight: 600; cursor: pointer; }
+.grupos button[aria-pressed='true'] { border-color: var(--azul); background: var(--azul); color: #fff; }
+.indicadores { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+@media (min-width: 640px) { .indicadores { grid-template-columns: repeat(3, 1fr); } }
+.indicador { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio); padding: 12px; cursor: pointer; text-align: left; }
+.indicador[aria-pressed='true'] { border-color: var(--azul); box-shadow: inset 0 0 0 1px var(--azul); }
+.indicador .nombre { font-size: 14px; color: var(--gris); min-height: 2.6em; }
+.indicador .valor { font-family: var(--fuente-c); font-weight: 700; font-size: 34px; line-height: 1.05; }
+.indicador .unidad { font-size: 15px; font-weight: 500; color: var(--gris); margin-left: 3px; }
+.indicador canvas { width: 100%; height: 36px; display: block; margin-top: 6px; }
+.grafica-grande { width: 100%; height: 220px; display: block; }
+.grabando { display: inline-flex; align-items: center; gap: 8px; color: var(--rojo); font-weight: 700; }
+.grabando::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--rojo); animation: latido 1s ease-in-out infinite; }
+@keyframes latido { 50% { opacity: 0.3; } }
+
+/* ---------- Navegación inferior ---------- */
+.pestanas {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--superficie); border-top: 1px solid var(--linea);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pestanas button {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-height: 64px; padding: 8px 2px 6px; border: 0; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--gris);
+}
+.pestanas svg { width: 24px; height: 24px; }
+.pestanas button[aria-current='page'] { color: var(--azul); }
+.pestanas button[disabled] { opacity: 0.35; }
+.pestanas .insignia { position: absolute; transform: translate(14px, -4px); background: var(--rojo); color: #fff; border-radius: 99px; font-size: 11px; padding: 0 6px; }
+.pestanas button { position: relative; }
+
+/* ---------- Diálogos y avisos ---------- */
+dialog { border: 0; border-radius: 14px; padding: 20px; width: min(520px, calc(100vw - 32px)); background: var(--superficie); color: var(--texto); }
+dialog::backdrop { background: rgba(20, 26, 33, 0.55); }
+dialog h3 { font-size: 22px; margin-bottom: 8px; }
+.campo { display: grid; gap: 4px; margin: 12px 0; }
+.campo label { font-size: 14px; color: var(--gris); font-weight: 600; }
+.campo input, .campo select, .campo textarea { min-height: 48px; padding: 10px 12px; border-radius: 8px; border: 2px solid var(--linea); background: var(--superficie); }
+.check { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; }
+.check input { width: 24px; height: 24px; flex: none; }
+.toast {
+  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50;
+  background: var(--asfalto); color: #fff; padding: 12px 18px; border-radius: 10px; max-width: calc(100vw - 32px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+:root[data-theme='dark'] .toast { background: #000; }
+.aviso { padding: 12px 14px; border-radius: 8px; background: var(--ambar-fondo); border-left: 4px solid var(--ambar); margin: 12px 0; }
+.aviso.error { background: var(--rojo-fondo); border-color: var(--rojo); }
+.ia-texto { white-space: pre-wrap; line-height: 1.55; }
+.demo-cinta { background: var(--ambar-fondo); color: var(--texto); text-align: center; font-size: 14px; padding: 6px 12px; border-bottom: 1px solid var(--linea); }
+
+table.hist { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.hist td, table.hist th { padding: 10px 6px; border-bottom: 1px solid var(--linea); text-align: left; vertical-align: top; }
+table.hist th { font-size: 14px; color: var(--gris); font-weight: 600; }
+body::before { content: ''; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: #143f7a; }
+
+/* El estado de la barra lleva a la pantalla de conexión (prueba de batería y registro) */
+button.estado { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 6px 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; }
+button.estado:hover { background: rgba(255,255,255,0.12); }
+
+/* Etiqueta de estado de batería y alternador */
+.etiqueta-estado { display: inline-block; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--aluminio); }
+.etiqueta-estado.verde { background: var(--verde-fondo); color: var(--verde); }
+.etiqueta-estado.ambar { background: var(--ambar-fondo); color: var(--ambar); }
+.etiqueta-estado.rojo { background: var(--rojo-fondo); color: var(--rojo); }
+
+/* Todas las centralitas (UDS) */
+.todas { margin-top: 24px; border-top: 1px solid var(--linea); padding-top: 8px; }
+.centralita { background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio); padding: 10px 14px; margin: 8px 0; }
+.centralita summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.centralita summary .etiqueta-estado { margin-left: auto; }
+.centralita.con-averias { border-left: 4px solid var(--rojo); }
+.peligro-txt { color: var(--rojo) !important; }
+
+/* Modo 06 */
+table.m06 { width: 100%; border-collapse: collapse; font-size: .9rem; margin-bottom: 12px; }
+table.m06 th, table.m06 td { padding: 6px 8px; border-bottom: 1px solid var(--borde, #ddd); text-align: left; }
+table.m06 td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.m06 tr.m06-mon td { font-weight: 600; background: var(--fondo-suave, rgba(0,0,0,.04)); }
+table.m06 tr.m06-mal td { background: rgba(200, 40, 40, .10); }
+table.m06 tr.m06-cerca td { background: rgba(220, 150, 0, .12); }
+.tabla-scroll { overflow-x: auto; }

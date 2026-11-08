@@ -1,0 +1,52 @@
+﻿REYMAN DIAG v0.4.3 - PRUEBAS EN EL PORTÁTIL (Windows): MAXIVCI V200 Y ADAPTADOR WI-FI
+=====================================================================================
+
+Qué es
+- La app Reyman Diag en modo pruebas, para el portátil.
+- Novedad v0.4: conexión con la interfaz Autel MaxiVCI V200 (J2534). Lee el OBD
+  y además las averías de TODAS las centralitas CAN (motor, ABS, airbag, BSI...).
+- No guarda nada en el servidor ni en las OT. Todo queda en un registro descargable.
+- No instala nada. Para cerrarlo, cierra la ventana negra.
+
+Antes de empezar
+1. Borra o sustituye la carpeta de pruebas anterior por esta.
+2. Cierra Maxi PC Suite y apaga (o desconecta) la tablet MS919: la V200 solo
+   puede usarla un programa a la vez.
+
+PRUEBA CON LA MAXIVCI V200
+1. V200 en la toma OBD del coche y cable USB al portátil. Luz verde encendida.
+2. Contacto puesto, MOTOR PARADO (para el escaneo de centralitas).
+3. Doble clic en "Iniciar Reyman Diag".
+   Se abre una ventana negra (no la cierres) y la app en Chrome o Edge.
+   Arriba debe poner "Modo pruebas v0.4.3".
+   La ventana negra debe decir "J2534: preparado".
+   Si Windows avisa "Windows protegió su PC": "Más información" > "Ejecutar de todas formas".
+4. En la app, pulsa "MaxiVCI (J2534)" y espera la lectura (sale sola).
+5. Pestaña "Averías" > recuadro "Todas las centralitas" > "Escanear todas las centralitas".
+   Tarda unos 20-60 segundos. Saldrá cada centralita con su nombre y averías.
+6. Borrado: solo si quieres probarlo, en UNA centralita con una avería conocida.
+   Queda apuntado en el registro.
+7. Pre-ITV > "Leer pruebas (modo 06)": pruebas internas de catalizador, sondas, fallos...
+8. Ford híbrido: en Vehículo, recuadro "Batería de alta tensión" > "Leer batería híbrida"
+   (carga, tensión y celdas). Con el motor en marcha, "En vivo (cada 2 s)".
+9. Si da tiempo: arranca el motor, pestaña "En vivo" 1 minuto, y la prueba de
+   "Batería y alternador" (en Vehículo).
+
+PRUEBA CON EL ADAPTADOR WI-FI (como antes)
+1. Adaptador en la toma OBD y contacto puesto.
+2. Wi-Fi del portátil a la red del adaptador (WiFi_OBDII o parecido; clave 12345678 o ninguna).
+3. "Iniciar Reyman Diag", pulsa "Wi-Fi" y "Conectar" (192.168.0.10, puerto 35000).
+
+Al terminar
+- Botón "Descargar registro" (en Vehículo, o en "Conectar" > "Registro de comunicación").
+- Se guarda reyman-diag-registro-....json en Descargas. Cópialo a la carpeta
+  REYMAN DIAG de Drive y avisa a Claude. Apunta marca, modelo, año y motor.
+
+Si algo falla
+- "No está abierto el programa de enlace": la ventana negra se ha cerrado. Vuelve a abrirla.
+- "La V200 está ocupada" / error 8: cierra Maxi PC Suite y la tablet, desenchufa el USB
+  y vuelve a enchufarlo.
+- "No encuentro el controlador J2534": instala o actualiza Maxi PC Suite.
+- La ventana negra no puede abrir el puerto: clic derecho en "Iniciar Reyman Diag" >
+  Ejecutar como administrador.
+- Si la app se queda pensando más de 1 minuto: descarga el registro igualmente.

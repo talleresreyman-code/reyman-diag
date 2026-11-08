@@ -1,0 +1,25 @@
+{
+  "name": "reyman-connect",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reyman Connect · app de cliente (iPhone y Android) con adaptador OBD Bluetooth. Usa el núcleo OBD común de packages/obd-core.",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "demo": "node scripts/build.js --demo",
+    "cap:sync": "npm run build && npx cap sync",
+    "android": "npm run build && npx cap sync android && npx cap open android",
+    "ios": "npm run build && npx cap sync ios && npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.3.0",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
+    "@capacitor/preferences": "^8.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "esbuild": "^0.25.12"
+  }
+}

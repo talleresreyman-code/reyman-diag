@@ -1,0 +1,15 @@
+{
+  "appId": "es.talleresreyman.connect",
+  "appName": "Reyman Connect",
+  "webDir": "www",
+  "plugins": {
+    "BluetoothLe": {
+      "displayStrings": {
+        "scanning": "Buscando el adaptador…",
+        "cancel": "Cancelar",
+        "availableDevices": "Adaptadores disponibles",
+        "noDeviceFound": "No se ha encontrado ningún adaptador"
+      }
+    }
+  }
+}

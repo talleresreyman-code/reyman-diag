@@ -1,0 +1,8 @@
+{
+  "name": "@reyman/obd-core",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Núcleo OBD común de Reyman Diag (taller) y Reyman Connect (cliente): ELM327, protocolos, PIDs, averías, VIN, batería, grabación y conexiones.",
+  "exports": { "./*": "./src/*" }
+}

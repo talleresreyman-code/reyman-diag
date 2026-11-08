@@ -1,0 +1,40 @@
+# Reyman Diag · se publica en diag.talleresreyman.es a través del proxy del VPS (igual que la App Reyman)
+services:
+  diag:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3020
+      DATABASE_URL: postgres://diag:${DB_PASSWORD}@db:5432/diag
+    ports:
+      - "127.0.0.1:3020:3020"
+    depends_on:
+      db:
+        condition: service_healthy
+    # Red del Caddy de n8n: Caddy la publica en diag.talleresreyman.es y desde aquí se llega a la App Reyman (reyman-app:3000)
+    networks:
+      default:
+      proxy:
+        aliases: [reyman-diag]
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: diag
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: diag
+    volumes:
+      - diag-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diag"]
+      interval: 5s
+      retries: 10
+networks:
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-n8n_default}
+
+volumes:
+  diag-db:
