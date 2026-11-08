@@ -169,8 +169,8 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     try { fs.writeFileSync(act('pedido'), `${req.s.usuario.nombre}\n`); } catch { return rep.code(500).send({ error: 'No se pudo avisar al servidor (falta la carpeta compartida).' }); }
     return { ok: true };
   });
-  app.post('/api/version/comprobar', { preHandler: exigir('diag.actualizar') }, async () => {
-    try { fs.writeFileSync(act('comprobar'), '1'); } catch { /* */ }
+  app.post('/api/version/comprobar', { preHandler: exigir('diag.actualizar') }, async (req, rep) => {
+    try { fs.writeFileSync(act('comprobar'), '1'); } catch { return rep.code(500).send({ error: 'El servidor no tiene preparada la carpeta de actualizaciones: ejecuta una vez «deploy/actualizar.sh» en el VPS.' }); }
     return { ok: true };
   });
 

@@ -187,7 +187,12 @@ async function pintarVersion() {
       html += `<div class="aviso peq" style="margin-top:8px"><strong>Hay una versión nueva</strong> (${esc(v.disponible.commit)}): ${esc(v.disponible.mensaje || '')}
         ${(v.cambios || []).length > 1 ? `<ul>${v.cambios.slice(0, 8).map((c) => `<li>${esc(c.mensaje)}</li>`).join('')}</ul>` : ''}
         <div class="fila-btn"><button class="btn" id="ver-actualizar">Actualizar el servidor</button></div></div>`;
-    } else html += ' · <button class="btn fantasma" id="ver-comprobar" style="padding:2px 8px">Buscar actualizaciones</button>';
+    } else {
+      const visto = v.disponible?.cuando ? ` · comprobado ${esc(fechaCorta(v.disponible.cuando))}` : '';
+      html += !inst.commit ? ' · <span class="peligro-txt">El servidor no tiene activado el sistema de actualizaciones (ejecuta una vez «deploy/actualizar.sh» en el VPS).</span>'
+        : v.disponible?.error ? ` · <span class="peligro-txt">No se puede consultar GitHub: ${esc(v.disponible.error)}</span>`
+        : ` · al día${visto} · <button class="btn fantasma" id="ver-comprobar" style="padding:2px 8px">Buscar actualizaciones</button>`;
+    }
   }
   x.innerHTML = html;
   const b = $('#ver-actualizar');
@@ -202,7 +207,21 @@ async function pintarVersion() {
     pintarVersion();
   };
   const c = $('#ver-comprobar');
-  if (c) c.onclick = async () => { c.disabled = true; await fetch('/api/version/comprobar', { method: 'POST', credentials: 'include' }).catch(() => {}); toast('Buscando… en un minuto se ve si hay versión nueva.'); setTimeout(pintarVersion, 65000); };
+  if (c) c.onclick = async () => {
+    c.disabled = true; c.textContent = 'Buscando… (hasta 1 minuto)';
+    try {
+      const r3 = await fetch('/api/version/comprobar', { method: 'POST', credentials: 'include' });
+      if (!r3.ok) throw new Error((await r3.json().catch(() => ({}))).error || `Error ${r3.status}`);
+    } catch (e) { toast(e.message); c.disabled = false; c.textContent = 'Buscar actualizaciones'; return; }
+    // El vigilante del servidor mira GitHub cada minuto: se repasa cada 10 s hasta que conteste
+    const antes = v.disponible?.cuando || '';
+    let n = 0;
+    const t = setInterval(async () => {
+      n++;
+      let v2; try { v2 = await (await fetch('/api/version', { credentials: 'include' })).json(); } catch { return; }
+      if ((v2.disponible?.cuando || '') !== antes || n > 9) { clearInterval(t); if (n > 9 && (v2.disponible?.cuando || '') === antes) toast('El servidor no ha contestado: revisa que el vigilante esté activo (deploy/actualizar.sh).'); pintarVersion(); }
+    }, 10000);
+  };
 }
 function esperarActualizacion(antes) {
   const t = setInterval(async () => {
