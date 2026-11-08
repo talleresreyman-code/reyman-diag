@@ -301,7 +301,7 @@ export function crearTransporteJ2534(op = {}) {
       st.interfaz = nombre || 'J2534';
       try { await rpc('abrir', 20000); } catch (e) {
         // 8 = ocupada por otro programa; 1/3/4 = no está enchufada o sin controlador
-        const msg = e.j2534 === 8 ? 'La V200 está ocupada: cierra Maxi PC Suite y la tablet MS919, desenchufa el USB y vuelve a enchufarlo.'
+        const msg = e.j2534 === 8 ? `La interfaz ${st.interfaz || 'Autel'} no responde (no está enchufada o la está usando otro programa): comprueba el USB, cierra Maxi PC Suite y la tablet, y vuelve a intentarlo.`
           : [1, 3, 4].includes(e.j2534) ? 'No se encuentra la V200: comprueba el cable USB y que tenga la luz verde.' : `No se puede abrir la interfaz: ${e.message}`;
         try { canal.cerrar(); } catch { /* */ }
         throw Object.assign(new Error(msg), { code: 'J2534', j2534: e.j2534 });
