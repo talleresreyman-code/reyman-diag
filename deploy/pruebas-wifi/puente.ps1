@@ -18,6 +18,21 @@ function Log($t) {
   Write-Host $l
   try { Add-Content -Path $script:logFile -Value $l -Encoding UTF8 } catch { }
 }
+Log ('Arrancando el enlace (PowerShell ' + $PSVersionTable.PSVersion + ', ' + ([IntPtr]::Size * 8) + ' bits)')
+# Cualquier error que pare el programa queda en enlace.log y la ventana no se cierra
+trap { Log ('ERROR: ' + $_.Exception.Message); Read-Host 'Pulsa Intro para cerrar'; exit 1 }
+
+# Si ya hay otro enlace abierto (de esta u otra versión), se cierra para que no choquen en el puerto
+try {
+  $otros = @(Get-NetTCPConnection -LocalPort $Puerto -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ -ne $PID -and $_ -ne 4 })
+  foreach ($o in $otros) { $pr = Get-Process -Id $o -ErrorAction SilentlyContinue; if ($pr -and $pr.ProcessName -match 'powershell') { Log ('Cerrando un enlace anterior (proceso ' + $o + ')'); Stop-Process -Id $o -Force; Start-Sleep -Milliseconds 800 } }
+} catch { }
+
+# Ventana minimizada en la barra de tareas
+try {
+  Add-Type -Name Ventana -Namespace Reyman -MemberDefinition '[DllImport("kernel32.dll")] public static extern System.IntPtr GetConsoleWindow(); [DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr h, int n);'
+  [void][Reyman.Ventana]::ShowWindow([Reyman.Ventana]::GetConsoleWindow(), 6)
+} catch { }
 
 # Solo se permite conectar a direcciones de red local (el adaptador), nunca a internet
 function DireccionPermitida([string]$ip) {
