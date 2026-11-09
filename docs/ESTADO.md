@@ -111,8 +111,14 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Límite: un programador que deja el CVN original no se detecta por este método.
 - Enlace (`puente.ps1`): vuelto a la versión probada sin el reinicio automático al cambiar de interfaz; «Iniciar Reyman Diag» apunta en `enlace.log` cada arranque y no cierra la ventana si el programa se para.
 
+### 16. Grabación automática de cada sesión de diagnóstico → v0.4.10 (09/11/2026)
+- Desde «Conectar» hasta «Desconectar», la app guarda sola la sesión completa: toda la comunicación, todas las lecturas y pruebas (UDS, modo 06, servicio 09, batería, batería AT, foto de datos) y **dos informes HTML (taller y cliente)**. Constante `GRABACION_AUTO` en `apps/taller/app.js`.
+- Se guarda con la primera lectura (el nombre lleva fecha, hora y matrícula o bastidor: `AAAAMMDD_HHMMSS_<coche>`), 5 s después de cada lectura o prueba nueva, cada minuto si hay comunicación nueva y al desconectar (o si falla la conexión).
+- Destinos: 1) portátil, con el programa de enlace: `REYMAN DIAG\Sesiones de diagnóstico\<sesión>\registro.json, informe-taller.html, informe-cliente.html` (fuera de la carpeta de la versión). Con la V200 o el Wi-Fi conectados el enlace está ocupado, así que ahí se guarda al desconectar. 2) servidor (app online): tabla `diag_registros` (migración 005), `POST /api/registros`; n8n la copia cada noche a OneDrive `DIAGNOSIS OBD/<año>/1-A-<OT> <matrícula>/Sesión <id>/` (Informe taller, Informe cliente, Registro completo); si se vuelve a guardar después de copiarla, se copia otra vez.
+- Enlace: endpoint `POST /guardar` (solo nombres seguros, .json y .html, máx. 60 MB) y al arrancar cierra cualquier otro PowerShell que esté ejecutando un `puente.ps1` (antes no los encontraba porque el puerto lo tiene el proceso System → «conflicto con un registro existente»).
+
 ### Pruebas
-- **101 pruebas automáticas.**
+- **102 pruebas automáticas.**
 
 ## Pendiente
 

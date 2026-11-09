@@ -35,6 +35,7 @@ function apiReal() {
     listarSesiones: (q = {}) => pedir('GET', `/api/sesiones?${new URLSearchParams(Object.entries(q).filter(([, v]) => v))}`),
     obtenerSesion: (id) => pedir('GET', `/api/sesiones/${encodeURIComponent(id)}`),
     comprobarCvn: (d) => pedir('POST', '/api/cvn/comprobar', d),
+    guardarRegistro: (d) => pedir('POST', '/api/registros', d),
     referenciaCvn: (d) => pedir('POST', '/api/cvn/referencia', d),
     enviarInforme: (d) => pedir('POST', '/api/informes/enviar', d),
     diagnosticoIa: (d) => pedir('POST', '/api/ia/diagnostico', d),
@@ -91,6 +92,7 @@ function apiDemo() {
         return r;
       }) };
     },
+    async guardarRegistro() { return { ok: true }; },
     async referenciaCvn({ calid, cvn }) { await espera(100); mem.cvnRef[normCalid(calid)] = { cvn: normCvn(cvn), creada: new Date() }; return { ok: true }; },
     async obtenerSesion(i) { await espera(150); const s = mem.sesiones.find((x) => x.id === i); if (!s) throw new Error('Grabación no encontrada.'); return s; },
     async guardarSesion(s) { await espera(); const nuevo = id(); mem.sesiones.unshift({ ...s, id: nuevo, usuario: 'Mecánico (demo)', num_muestras: s.muestras.length, creada: new Date().toISOString() }); return { id: nuevo, destino: `se ve en «Datos grabados» y esta noche se copia a OneDrive (DIAGNOSIS OBD/${new Date().getFullYear()}/${s.ot ? `1-A-${s.ot}` : 'SIN OT'} ${s.matricula || ''})` }; },

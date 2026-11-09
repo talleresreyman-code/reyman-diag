@@ -114,6 +114,30 @@ async function storePg({ url }) {
       const { rowCount } = await q('UPDATE diag_sesiones SET subida_en = now(), onedrive = $3 WHERE tenant_id = $1 AND id = $2', [t, id, destino]);
       return rowCount > 0;
     },
+    async guardarRegistro(t, d) {
+      const { rows } = await q(
+        `INSERT INTO diag_registros (tenant_id, id, ot, matricula, vin, usuario, inicio, terminada, datos, informe_taller, informe_cliente)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         ON CONFLICT (tenant_id, id) DO UPDATE SET ot = EXCLUDED.ot, matricula = EXCLUDED.matricula, vin = EXCLUDED.vin, terminada = EXCLUDED.terminada,
+           datos = EXCLUDED.datos, informe_taller = EXCLUDED.informe_taller, informe_cliente = EXCLUDED.informe_cliente, actualizado = now()
+         RETURNING actualizado`,
+        [t, d.id, d.ot, d.matricula, d.vin, d.usuario, d.inicio, !!d.terminada, JSON.stringify(d.datos), d.informe_taller, d.informe_cliente],
+      );
+      return rows[0];
+    },
+    async registrosPendientes(t, limite = 10) {
+      const { rows } = await q('SELECT * FROM diag_registros WHERE tenant_id = $1 AND (subido IS NULL OR subido < actualizado) ORDER BY actualizado LIMIT $2', [t, limite]);
+      return rows;
+    },
+    async marcarRegistroSubido(t, id, actualizado, destino) {
+      // Solo se da por subida la versión que se copió: si se ha vuelto a guardar después, queda pendiente
+      const { rowCount } = await q(
+        "UPDATE diag_registros SET subido = actualizado, onedrive = $4 WHERE tenant_id = $1 AND id = $2 AND actualizado <= $3::timestamptz + interval '1 millisecond'",
+        [t, id, actualizado, destino],
+      );
+      if (rowCount) return true;
+      return (await q('SELECT 1 FROM diag_registros WHERE tenant_id = $1 AND id = $2', [t, id])).rowCount > 0;
+    },
     async cvnDatos(t, calid, vin) {
       const ref = (await q('SELECT cvn, creada FROM diag_cvn_ref WHERE tenant_id = $1 AND calid = $2', [t, calid])).rows[0] || null;
       const propias = (await q('SELECT cvn, primera, ultima FROM diag_cvn WHERE tenant_id = $1 AND calid = $2 AND vin = $3', [t, calid, vin])).rows;
@@ -162,7 +186,7 @@ async function storePg({ url }) {
 
 // ---------------------------------------------------------------------------
 function storeMemoria() {
-  const db = { lecturas: [], borrados: [], sesiones: [], ia: [], auditoria: [], connect: [], cvn: [], cvnRef: [] };
+  const db = { lecturas: [], borrados: [], sesiones: [], ia: [], auditoria: [], connect: [], cvn: [], cvnRef: [], registros: [] };
   const id = () => crypto.randomUUID();
   const de = (t, lista) => lista.filter((x) => x.tenant_id === t);
   return {
@@ -198,6 +222,14 @@ function storeMemoria() {
         .map(({ muestras, tenant_id: _t, ...s }) => ({ ...s, con_datos: !!muestras }));
     },
     async obtenerSesion(t, i) { return de(t, db.sesiones).find((s) => s.id === i) || null; },
+    async guardarRegistro(t, d) {
+      const r = de(t, db.registros).find((x) => x.id === d.id);
+      const actualizado = new Date(Math.max(Date.now(), (r?.actualizado?.getTime() || 0) + 1));
+      if (r) Object.assign(r, d, { actualizado }); else db.registros.push({ tenant_id: t, ...d, actualizado, subido: null });
+      return { actualizado };
+    },
+    async registrosPendientes(t) { return de(t, db.registros).filter((r) => !r.subido || r.subido < r.actualizado); },
+    async marcarRegistroSubido(t, i, actualizado, destino) { const r = de(t, db.registros).find((x) => x.id === i); if (!r) return false; if (r.actualizado <= new Date(actualizado)) { r.subido = r.actualizado; r.onedrive = destino; } return true; },
     async cvnDatos(t, calid, vin) {
       const ref = de(t, db.cvnRef).find((r) => r.calid === calid) || null;
       const filas = de(t, db.cvn).filter((r) => r.calid === calid);

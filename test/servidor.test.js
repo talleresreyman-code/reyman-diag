@@ -121,3 +121,22 @@ test('CVN: se apunta, se compara con otros coches y la referencia de fábrica so
   assert.equal((await app.inject({ method: 'POST', url: '/api/cvn/referencia', headers: H('mecanico'), payload: { calid: '5G0259N 0003BECD', cvn: '12345678' } })).statusCode, 403);
   assert.equal((await pedir('corto', 'BCDF02EB')).statusCode, 400);
 });
+
+test('Grabación automática de la sesión: se guarda, se actualiza y n8n la copia con sus informes', async () => {
+  const cuerpo = (n) => ({ id: '20261109_111800_4521KLM', ot: '261402', matricula: '4521 KLM', inicio: '2026-11-09T10:18:00Z', datos: { registro: Array(n).fill({ t: 'x', dir: 'tx', txt: '0100' }) }, informes: { taller: '<html>t</html>', cliente: '<html>c</html>' } });
+  assert.equal((await app.inject({ method: 'POST', url: '/api/registros', headers: H('mecanico'), payload: cuerpo(3) })).statusCode, 200);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/registros', headers: H('mecanico'), payload: { ...cuerpo(1), id: '../malo' } })).statusCode, 400);
+  const p = (await app.inject({ url: '/api/ingest/registros', headers: { 'x-api-key': 'k' } })).json().registros;
+  assert.equal(p.length, 1);
+  assert.match(p[0].carpeta, /DIAGNOSIS OBD\/2026\/1-A-261402 4521KLM\/Sesión 20261109_111800_4521KLM$/);
+  assert.deepEqual(p[0].archivos.map((a) => a.ruta.split('/').pop()), ['Informe taller.html', 'Informe cliente.html', 'Registro completo.json']);
+  // Se vuelve a guardar antes de marcarla: la versión copiada no la da por buena
+  const viejo = p[0].actualizado;
+  await new Promise((r) => setTimeout(r, 5));
+  await app.inject({ method: 'POST', url: '/api/registros', headers: H('mecanico'), payload: cuerpo(5) });
+  await app.inject({ method: 'POST', url: `/api/ingest/registros/${p[0].id}/subido`, headers: { 'x-api-key': 'k' }, payload: { actualizado: viejo, destino: 'x' } });
+  const p2 = (await app.inject({ url: '/api/ingest/registros', headers: { 'x-api-key': 'k' } })).json().registros;
+  assert.equal(p2.length, 1);
+  await app.inject({ method: 'POST', url: `/api/ingest/registros/${p2[0].id}/subido`, headers: { 'x-api-key': 'k' }, payload: { actualizado: p2[0].actualizado, destino: 'x' } });
+  assert.equal((await app.inject({ url: '/api/ingest/registros', headers: { 'x-api-key': 'k' } })).json().registros.length, 0);
+});

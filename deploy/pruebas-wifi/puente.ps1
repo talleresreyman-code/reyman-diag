@@ -27,6 +27,13 @@ try {
   $otros = @(Get-NetTCPConnection -LocalPort $Puerto -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ -ne $PID -and $_ -ne 4 })
   foreach ($o in $otros) { $pr = Get-Process -Id $o -ErrorAction SilentlyContinue; if ($pr -and $pr.ProcessName -match 'powershell') { Log ('Cerrando un enlace anterior (proceso ' + $o + ')'); Stop-Process -Id $o -Force; Start-Sleep -Milliseconds 800 } }
 } catch { }
+# Los enlaces escuchan a través de Windows (proceso «System»), así que lo anterior no siempre los encuentra:
+# se buscan también por su línea de comandos (cualquier PowerShell que esté ejecutando un puente.ps1)
+try {
+  $viejos = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match 'puente\.ps1' })
+  foreach ($v in $viejos) { Log ('Cerrando un enlace anterior (proceso ' + $v.ProcessId + ')'); Stop-Process -Id $v.ProcessId -Force -ErrorAction SilentlyContinue }
+  if ($viejos.Count -gt 0) { Start-Sleep -Milliseconds 1200 }
+} catch { }
 
 
 # Solo se permite conectar a direcciones de red local (el adaptador), nunca a internet
@@ -201,6 +208,31 @@ function ServirApp($ctx) {
       $b = [Text.Encoding]::UTF8.GetBytes($j)
       $res.ContentType = 'application/json; charset=utf-8'
       $res.Headers.Add('Cache-Control', 'no-store')
+      $res.ContentLength64 = $b.Length
+      $res.OutputStream.Write($b, 0, $b.Length)
+    } elseif ($ruta -eq '/guardar') {
+      # Grabación automática de cada sesión de diagnóstico (fase de pruebas):
+      # REYMAN DIAG\Sesiones de diagnóstico\<sesión>\<archivo>, fuera de la carpeta de la versión para que no se borre al actualizar
+      $origen = $ctx.Request.Headers['Origin']
+      if ($origen -match '^https://([a-z0-9-]+\.)*talleresreyman\.es$' -or $origen -match '^http://(localhost|127\.0\.0\.1)(:\d+)?$') {
+        $res.Headers.Add('Access-Control-Allow-Origin', $origen)
+        $res.Headers.Add('Access-Control-Allow-Private-Network', 'true')
+        $res.Headers.Add('Access-Control-Allow-Methods', 'POST')
+        $res.Headers.Add('Access-Control-Allow-Headers', 'content-type')
+        $res.Headers.Add('Vary', 'Origin')
+      } elseif ($origen) { $res.StatusCode = 403; return }
+      if ($ctx.Request.HttpMethod -eq 'OPTIONS') { $res.StatusCode = 204; return }
+      $carpeta = [string]$ctx.Request.QueryString['carpeta']
+      $archivo = [string]$ctx.Request.QueryString['archivo']
+      if ($ctx.Request.HttpMethod -ne 'POST' -or $carpeta -notmatch '^[A-Za-z0-9_-]{1,80}$' -or $archivo -notmatch '^[A-Za-z0-9_-]{1,60}\.(json|html)$') { $res.StatusCode = 400; return }
+      if ($ctx.Request.ContentLength64 -gt 60MB) { $res.StatusCode = 413; return }
+      $destino = Join-Path (Join-Path (Split-Path -Parent $dir) 'Sesiones de diagnóstico') $carpeta
+      if (-not (Test-Path $destino)) { New-Item -ItemType Directory -Path $destino -Force | Out-Null }
+      $ms = New-Object IO.MemoryStream
+      $ctx.Request.InputStream.CopyTo($ms)
+      [IO.File]::WriteAllBytes((Join-Path $destino $archivo), $ms.ToArray())
+      $b = [Text.Encoding]::UTF8.GetBytes('{"ok":true}')
+      $res.ContentType = 'application/json; charset=utf-8'
       $res.ContentLength64 = $b.Length
       $res.OutputStream.Write($b, 0, $b.Length)
     } elseif ($ruta -eq '/' -or $ruta -eq '/index.html') {

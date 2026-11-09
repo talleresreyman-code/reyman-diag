@@ -252,6 +252,19 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     return { id: r.id, destino: `se ve en «Datos grabados» y esta noche se copia a OneDrive (${ruta.carpeta.replace(/^01_TALLERES REYMAN\//, '')})` };
   });
 
+  // --- grabación automática de cada sesión de diagnóstico ---
+  app.post('/api/registros', { preHandler: exigir('diag.leer'), bodyLimit: 60 * 1024 * 1024 }, async (req, rep) => {
+    const b = req.body || {};
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(String(b.id || '')) || typeof b.datos !== 'object' || !b.datos) return rep.code(400).send({ error: 'Sesión no válida.' });
+    const r = await store.guardarRegistro(req.s.tenant, {
+      id: b.id, ot: b.ot || null, matricula: limpiarMat(b.matricula), vin: b.vin || null, usuario: req.s.usuario.nombre,
+      inicio: b.inicio || null, terminada: !!b.terminada, datos: b.datos,
+      informe_taller: typeof b.informes?.taller === 'string' ? b.informes.taller : null,
+      informe_cliente: typeof b.informes?.cliente === 'string' ? b.informes.cliente : null,
+    });
+    return { ok: true, actualizado: r.actualizado };
+  });
+
   // --- CVN: ¿software original? (servicio 09) ---
   app.post('/api/cvn/comprobar', { preHandler: exigir('diag.leer') }, async (req, rep) => {
     const b = req.body || {};
@@ -337,6 +350,27 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     const t = req.query.taller || cfg.tenantPorDefecto;
     const filas = await store.sesionesPendientes(t, 50);
     return { sesiones: filas.map((s) => ({ id: s.id, ot: s.ot, matricula: s.matricula, vin: s.vin, inicio: s.inicio, duracion_s: s.duracion_s, num_muestras: s.num_muestras, ...rutaOneDrive(s), csv: sesionCsv(s) })) };
+  });
+  // Sesiones de diagnóstico grabadas: carpeta de la OT en OneDrive + subcarpeta «Sesión <id>» con registro e informes
+  app.get('/api/ingest/registros', { preHandler: ingest }, async (req) => {
+    const t = req.query.taller || cfg.tenantPorDefecto;
+    const filas = await store.registrosPendientes(t, 10);
+    return {
+      registros: filas.map((r) => {
+        const { carpeta } = rutaOneDrive({ ot: r.ot, matricula: r.matricula, vin: r.vin, inicio: r.inicio || r.actualizado });
+        const dir = `${carpeta}/Sesión ${r.id}`;
+        const archivos = [
+          ...(r.informe_taller ? [{ ruta: `${dir}/Informe taller.html`, tipo: 'text/html; charset=utf-8', contenido: r.informe_taller }] : []),
+          ...(r.informe_cliente ? [{ ruta: `${dir}/Informe cliente.html`, tipo: 'text/html; charset=utf-8', contenido: r.informe_cliente }] : []),
+          { ruta: `${dir}/Registro completo.json`, tipo: 'application/json; charset=utf-8', contenido: JSON.stringify(r.datos, null, 1) },
+        ];
+        return { id: r.id, actualizado: new Date(r.actualizado).toISOString(), carpeta: dir, archivos };
+      }),
+    };
+  });
+  app.post('/api/ingest/registros/:id/subido', { preHandler: ingest }, async (req, rep) => {
+    const ok = await store.marcarRegistroSubido(req.query.taller || cfg.tenantPorDefecto, req.params.id, req.body?.actualizado || new Date().toISOString(), String(req.body?.destino || ''));
+    return ok ? { ok: true } : rep.code(404).send({ error: 'Sesión no encontrada.' });
   });
   app.post('/api/ingest/sesiones/:id/subida', { preHandler: ingest }, async (req, rep) => {
     const ok = await store.marcarSesionSubida(req.query.taller || cfg.tenantPorDefecto, req.params.id, String(req.body?.destino || ''));

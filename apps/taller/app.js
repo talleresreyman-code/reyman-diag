@@ -21,7 +21,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.9';
+const VERSION = '0.4.10';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -152,8 +152,10 @@ function vConectar() {
     </div>
     <details class="peq" style="margin-top:16px" ${PRUEBAS ? 'open' : ''}><summary>Registro de comunicación</summary><div class="registro" id="registro">${esc(estado.registro.slice(-60).join('\n'))}</div>
       <div class="fila-btn"><button class="btn fantasma" id="reg-descargar">Descargar registro</button>${PRUEBAS ? `<span class="peq suave">${estado.lecturasSesion.length} lecturas y pruebas en esta sesión</span>` : ''}</div></details>
+    <div id="auto-sesion" class="peq suave" style="margin-top:12px"></div>
     ${DEMO ? '' : '<div id="version-diag" class="peq suave" style="margin-top:16px"></div>'}`;
   $('#reg-descargar', el).onclick = descargarRegistro;
+  pintarAuto();
   pintarVersion();
   el.querySelectorAll('[data-con]').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.con === 'consulta') return dialogoConsulta();
@@ -281,6 +283,105 @@ function htmlBateriaAuto() {
     <div class="fila-btn"><button class="btn sec" id="bat-prueba3">Pruebas de batería y alternador</button></div>`;
 }
 
+// ---------------------------------------------------------------------------
+// Grabación automática de cada sesión de diagnóstico (fase de pruebas)
+// Desde que se pulsa «Conectar» hasta que se desconecta: toda la comunicación, todas las lecturas y pruebas,
+// y los dos informes (taller y cliente). Se guarda sola, sin pulsar nada:
+// - en el portátil, con el programa de enlace abierto: REYMAN DIAG\Sesiones de diagnóstico\<sesión>\
+// - en el servidor (app online), y n8n la copia por la noche a OneDrive junto a las grabaciones.
+// ---------------------------------------------------------------------------
+const GRABACION_AUTO = true;
+let temporizadorAuto = null;
+
+function nuevaSesionAuto(tipo) {
+  if (!GRABACION_AUTO || (DEMO && !PRUEBAS)) { estado.auto = null; return; }
+  estado.auto = {
+    inicio: new Date(), id: null, tipo, desdeRegistro: estado.registroCompleto.length, desdeLecturas: estado.lecturasSesion.length,
+    enCurso: false, otraVez: false, guardado: null, destinos: [], error: null,
+  };
+  pintarAuto();
+}
+
+function cambioAuto() {
+  if (!estado.auto) return;
+  clearTimeout(temporizadorAuto);
+  temporizadorAuto = setTimeout(() => guardarSesionAuto(), 5000);
+}
+// Cada lectura o prueba nueva guarda la sesión a los 5 s; además, cada minuto si hay comunicación nueva
+estado.lecturasSesion.push = function (...x) { const r = Array.prototype.push.apply(this, x); cambioAuto(); return r; };
+setInterval(() => { const a = estado.auto; if (a && a.id && estado.registroCompleto.length !== a.registroGuardado) guardarSesionAuto(); }, 60000);
+
+const dos = (n) => String(n).padStart(2, '0');
+function idSesionAuto(a) {
+  const f = a.inicio;
+  const coche = String(estado.ot?.matricula || estado.lectura?.vehiculo?.vin || estado.uds?.vin || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return `${f.getFullYear()}${dos(f.getMonth() + 1)}${dos(f.getDate())}_${dos(f.getHours())}${dos(f.getMinutes())}${dos(f.getSeconds())}${coche ? `_${coche}` : ''}`;
+}
+
+async function guardarSesionAuto({ final = false, sesion = null } = {}) {
+  const a = sesion || estado.auto;
+  if (!a) return;
+  if (a.enCurso) { a.otraVez = true; return; }
+  // El nombre se fija con la primera lectura (para que lleve la matrícula o el bastidor); sin lectura, solo al terminar
+  if (!a.id) { if (!estado.lectura && !final) return; a.id = idSesionAuto(a); }
+  a.enCurso = true;
+  const registro = estado.registroCompleto.slice(a.desdeRegistro);
+  const l = estado.lectura ? { ...estado.lectura, ot: estado.ot?.ot, matricula: estado.ot?.matricula ? formatoMatricula(estado.ot.matricula) : null, descripcionVehiculo: estado.ot?.vehiculo } : null;
+  const datos = {
+    app: 'Reyman Diag', version: VERSION, modo: PRUEBAS ? 'pruebas' : DEMO ? 'demo' : 'normal', sesion: a.id,
+    inicio: a.inicio.toISOString(), guardado: new Date().toISOString(), terminada: final, error: a.error,
+    usuario: estado.yo?.usuario?.nombre || null, navegador: navigator.userAgent, conexion: a.tipo, transporte: estado.transporte?.tipo || null,
+    adaptador: estado.elm?.info || null, ot: estado.ot || null, vehiculo: estado.lectura?.vehiculo || null,
+    lectura: estado.lectura, uds: estado.uds, modo06: estado.modo06, modo09: estado.modo09, bateriaHv: estado.bateriaHv,
+    bateriaAuto: estado.bateriaAuto, foto: estado.vivo.foto, lecturas: estado.lecturasSesion.slice(a.desdeLecturas), registro,
+  };
+  const logo = window.REYMAN_LOGO || new URL('logo.png', location.href).href;
+  const informes = l ? {
+    taller: htmlInforme(l, { version: 'interno', taller: estado.yo?.taller, logo }),
+    cliente: htmlInforme(l, { version: 'cliente', taller: estado.yo?.taller, logo }),
+  } : null;
+  const json = JSON.stringify(datos, null, 1);
+  const destinos = [];
+  let fallo = null;
+  // 1) Portátil: carpeta junto al programa de enlace. Mientras la V200 o el Wi-Fi están conectados el programa de enlace
+  //    está ocupado con el coche y no atiende otra cosa: entonces se guarda al desconectar (y en el servidor, siempre)
+  const enlaceOcupado = !final && estado.conectado && ['j2534', 'wifi'].includes(a.tipo);
+  if (conPuente() && !enlaceOcupado) {
+    const subir = (archivo, cuerpo) => fetch(`http://localhost:35001/guardar?carpeta=${encodeURIComponent(a.id)}&archivo=${archivo}`, {
+      method: 'POST', body: cuerpo, headers: { 'content-type': 'text/plain;charset=utf-8' }, signal: AbortSignal.timeout(final ? 30000 : 12000),
+    }).then((r) => { if (!r.ok) throw new Error(`enlace ${r.status}`); });
+    try {
+      await subir('registro.json', json);
+      if (informes) { await subir('informe-taller.html', informes.taller); await subir('informe-cliente.html', informes.cliente); }
+      destinos.push('portátil');
+    } catch (e) { fallo = `portátil: ${e.message}`; }
+  }
+  // 2) Servidor (app online)
+  if (!DEMO) {
+    try {
+      await api.guardarRegistro({ id: a.id, ot: estado.ot?.ot || null, matricula: estado.ot?.matricula || null, vin: estado.lectura?.vehiculo?.vin || null, inicio: datos.inicio, terminada: final, datos, informes });
+      destinos.push('servidor');
+    } catch (e) { fallo = `${fallo ? `${fallo} · ` : ''}servidor: ${e.message}`; }
+  }
+  a.enCurso = false;
+  if (!destinos.length && !fallo && enlaceOcupado) fallo = 'el programa de enlace está ocupado con el coche';
+  if (destinos.length) { a.guardado = new Date(); a.destinos = destinos; a.registroGuardado = estado.registroCompleto.length; }
+  a.fallo = destinos.length ? null : fallo;
+  log('·', `Grabación automática ${a.id}: ${destinos.length ? `guardada (${destinos.join(' y ')})` : `pendiente (${fallo || 'sin destino'})`}`);
+  pintarAuto(a);
+  if (a.otraVez) { a.otraVez = false; setTimeout(() => guardarSesionAuto({ final, sesion: a }), 1000); }
+}
+
+function pintarAuto(a = estado.auto || estado.autoUltima) {
+  const x = $('#auto-sesion');
+  if (!x) return;
+  if (!a) { x.innerHTML = GRABACION_AUTO ? 'Grabación automática activada: cada sesión de diagnóstico se guarda sola con sus dos informes.' : ''; return; }
+  x.innerHTML = a.guardado
+    ? `Sesión <strong>${esc(a.id)}</strong> guardada a las ${a.guardado.toLocaleTimeString('es-ES')} (${esc(a.destinos.join(' y '))})${a.destinos.includes('portátil') ? ' en «Sesiones de diagnóstico»' : ''}.`
+    : a.fallo ? `<span class="peligro-txt">Sesión ${esc(a.id || '')}: aún sin guardar (${esc(a.fallo)}). Se guardará al desconectar.</span>`
+      : 'Grabando la sesión de diagnóstico: se guarda sola con la primera lectura.';
+}
+
 // Registro descargable: comunicación completa + lecturas y pruebas de la sesión (para revisar con Claude)
 function descargarRegistro() {
   const datos = {
@@ -377,7 +478,7 @@ function dialogoBateria() {
 function log(dir, txt) {
   estado.registro.push(`${dir === 'tx' ? '→' : dir === 'rx' ? '←' : '·'} ${txt.replace(/\r/g, ' | ')}`);
   estado.registroCompleto.push({ t: new Date().toISOString(), dir, txt });
-  if (estado.registroCompleto.length > 30000) estado.registroCompleto.splice(0, 5000);
+  if (estado.registroCompleto.length > 30000) { estado.registroCompleto.splice(0, 5000); if (estado.auto) estado.auto.desdeRegistro = Math.max(0, estado.auto.desdeRegistro - 5000); }
   if (estado.registro.length > 400) estado.registro.splice(0, 100);
   const r = $('#registro');
   if (r) { r.textContent = estado.registro.slice(-60).join('\n'); r.scrollTop = r.scrollHeight; }
@@ -448,6 +549,7 @@ async function conectar(tipo, coche) {
   const paso = (t) => { prog.innerHTML = `<div class="progreso"><span class="giro"></span>${esc(t)}</div>`; estadoBarra(t, 'busy'); };
   try {
     if (estado.conectado) await desconectar(true);
+    nuevaSesionAuto(tipo);
     paso('Buscando el adaptador…');
     estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ puente: `ws://localhost:35001/j2534${coche ? `?dll=${encodeURIComponent(coche)}` : ''}`, log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
     await estado.transporte.conectar();
@@ -465,7 +567,8 @@ async function conectar(tipo, coche) {
   } catch (e) {
     estado.conectado = false;
     estadoBarra('Sin conectar');
-    if (e.name === 'NotFoundError' || e.name === 'AbortError') { prog.hidden = true; return; }
+    if (e.name === 'NotFoundError' || e.name === 'AbortError') { prog.hidden = true; estado.auto = null; return; }
+    if (estado.auto) { estado.auto.error = e.message; guardarSesionAuto({ final: true }); }
     // Cambio de interfaz Autel: el enlace se reinicia solo; se vuelve a intentar sin que haya que pulsar nada
     if (/Cambiando de interfaz/.test(e.message) && !estado.reintentoJ2534) {
       estado.reintentoJ2534 = true;
@@ -483,6 +586,8 @@ async function desconectar(silencioso) {
   pararRegistroBateria();
   try { await estado.elm?.cerrar(); } catch { /* */ }
   estado.conectado = false;
+  // Al soltar el adaptador el programa de enlace queda libre: es cuando se guarda seguro la sesión completa
+  if (estado.auto) { const a = estado.auto; estado.auto = null; estado.autoUltima = a; guardarSesionAuto({ final: true, sesion: a }); }
   estado.elm = null; estado.obd = null;
   estadoBarra('Sin conectar');
   if (!silencioso) ir('conectar');
