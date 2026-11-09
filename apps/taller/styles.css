@@ -307,3 +307,9 @@ table.m06 tr.m06-cerca td { background: rgba(220, 150, 0, .12); }
 .gr-item-cab { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
 .gr-item.gr-nueva { background: rgba(29, 87, 165, .07); }
 @media (max-width: 560px) { #gr-stats th:nth-child(5), #gr-stats td:nth-child(5) { display: none; } }
+/* Resultado del CVN */
+.cvn-res { display: inline-block; padding: 2px 10px; border-radius: 99px; font-weight: 700; font-size: 14px; color: #fff; }
+.cvn-ok { background: var(--verde); }
+.cvn-mal { background: var(--rojo); }
+.cvn-dudoso { background: var(--ambar); }
+.cvn-sin_ref { background: var(--gris); }

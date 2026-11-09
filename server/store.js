@@ -114,6 +114,22 @@ async function storePg({ url }) {
       const { rowCount } = await q('UPDATE diag_sesiones SET subida_en = now(), onedrive = $3 WHERE tenant_id = $1 AND id = $2', [t, id, destino]);
       return rowCount > 0;
     },
+    async cvnDatos(t, calid, vin) {
+      const ref = (await q('SELECT cvn, creada FROM diag_cvn_ref WHERE tenant_id = $1 AND calid = $2', [t, calid])).rows[0] || null;
+      const propias = (await q('SELECT cvn, primera, ultima FROM diag_cvn WHERE tenant_id = $1 AND calid = $2 AND vin = $3', [t, calid, vin])).rows;
+      const otros = (await q('SELECT cvn, COUNT(DISTINCT vin)::int AS coches FROM diag_cvn WHERE tenant_id = $1 AND calid = $2 AND vin <> $3 GROUP BY cvn', [t, calid, vin])).rows;
+      return { ref, propias, otros };
+    },
+    async cvnApuntar(t, d) {
+      await q(`INSERT INTO diag_cvn (tenant_id, calid, cvn, vin, matricula, ecu) VALUES ($1,$2,$3,$4,$5,$6)
+               ON CONFLICT (tenant_id, calid, cvn, vin) DO UPDATE SET ultima = now(), veces = diag_cvn.veces + 1, matricula = COALESCE(EXCLUDED.matricula, diag_cvn.matricula)`,
+      [t, d.calid, d.cvn, d.vin, d.matricula || null, d.ecu || null]);
+    },
+    async cvnReferencia(t, d) {
+      await q(`INSERT INTO diag_cvn_ref (tenant_id, calid, cvn, usuario, vin) VALUES ($1,$2,$3,$4,$5)
+               ON CONFLICT (tenant_id, calid) DO UPDATE SET cvn = EXCLUDED.cvn, usuario = EXCLUDED.usuario, vin = EXCLUDED.vin, creada = now()`,
+      [t, d.calid, d.cvn, d.usuario || null, d.vin || null]);
+    },
     async gastoIaMes(t) {
       const { rows } = await q("SELECT COALESCE(SUM(coste_eur),0)::float AS total FROM diag_ia_uso WHERE tenant_id = $1 AND creada >= date_trunc('month', now() AT TIME ZONE 'Europe/Madrid') AT TIME ZONE 'Europe/Madrid'", [t]);
       return rows[0].total;
@@ -146,7 +162,7 @@ async function storePg({ url }) {
 
 // ---------------------------------------------------------------------------
 function storeMemoria() {
-  const db = { lecturas: [], borrados: [], sesiones: [], ia: [], auditoria: [], connect: [] };
+  const db = { lecturas: [], borrados: [], sesiones: [], ia: [], auditoria: [], connect: [], cvn: [], cvnRef: [] };
   const id = () => crypto.randomUUID();
   const de = (t, lista) => lista.filter((x) => x.tenant_id === t);
   return {
@@ -182,6 +198,22 @@ function storeMemoria() {
         .map(({ muestras, tenant_id: _t, ...s }) => ({ ...s, con_datos: !!muestras }));
     },
     async obtenerSesion(t, i) { return de(t, db.sesiones).find((s) => s.id === i) || null; },
+    async cvnDatos(t, calid, vin) {
+      const ref = de(t, db.cvnRef).find((r) => r.calid === calid) || null;
+      const filas = de(t, db.cvn).filter((r) => r.calid === calid);
+      const propias = filas.filter((r) => r.vin === vin);
+      const por = new Map();
+      for (const r of filas.filter((x) => x.vin !== vin)) por.set(r.cvn, (por.get(r.cvn) || new Set()).add(r.vin));
+      return { ref, propias, otros: [...por].map(([cvn, v]) => ({ cvn, coches: v.size })) };
+    },
+    async cvnApuntar(t, d) {
+      const r = de(t, db.cvn).find((x) => x.calid === d.calid && x.cvn === d.cvn && x.vin === d.vin);
+      if (r) { r.ultima = new Date(); r.veces++; } else db.cvn.push({ tenant_id: t, ...d, primera: new Date(), ultima: new Date(), veces: 1 });
+    },
+    async cvnReferencia(t, d) {
+      db.cvnRef = db.cvnRef.filter((x) => !(x.tenant_id === t && x.calid === d.calid));
+      db.cvnRef.push({ tenant_id: t, ...d, creada: new Date() });
+    },
     async gastoIaMes(t) {
       const ini = new Date(); ini.setDate(1); ini.setHours(0, 0, 0, 0);
       return de(t, db.ia).filter((x) => x.creada >= ini).reduce((s, x) => s + x.coste_eur, 0);

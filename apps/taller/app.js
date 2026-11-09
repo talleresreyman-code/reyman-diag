@@ -21,7 +21,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.8';
+const VERSION = '0.4.9';
 const api = crearApi({ demo: DEMO });
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
@@ -911,7 +911,20 @@ function vItv() {
     ${estado.lectura.protocoloObd ? `<p class="peq suave">Protocolo: ${esc(estado.lectura.protocoloObd)}.</p>` : ''}`;
   const s06 = $('#m06', el);
   s06.onclick = (e) => { if (e.target.closest('#m06-leer')) leerModo06(); };
-  $('#m09', el).onclick = (e) => { if (e.target.closest('#m09-leer')) leerModo09(); };
+  $('#m09', el).onclick = async (e) => {
+    if (e.target.closest('#m09-leer')) return leerModo09();
+    const b = e.target.closest('[data-cvn-ref]');
+    if (!b) return;
+    const [ecu, i] = b.dataset.cvnRef.split('|');
+    const c = estado.modo09.ecus.find((x) => x.ecu === ecu)?.calibraciones[Number(i)];
+    if (!c || !window.confirm(`¿Seguro que este coche tiene el software original de fábrica?\n\n${c.id} · CVN ${c.cvn}\n\nA partir de ahora, cualquier coche con este software y otro CVN saldrá como MODIFICADO.`)) return;
+    try {
+      await api.referenciaCvn({ calid: c.id, cvn: c.cvn, vin: estado.lectura?.vehiculo?.vin || null });
+      c.verif = { estado: 'ok', motivo: 'Coincide con la referencia original de fábrica.' };
+      $('#m09').innerHTML = htmlModo09();
+      toast('Guardado como referencia original de fábrica.');
+    } catch (err) { toast(err.message); }
+  };
 }
 
 // Servicio 09: calibraciones con CVN y contadores de uso de los monitores (IUMPR)
@@ -926,7 +939,8 @@ function htmlModo09() {
   if (m.error) return `${cab}<div class="aviso">${esc(m.error)}</div>${boton}`;
   const bloques = m.ecus.map((e) => {
     const cal = e.calibraciones?.length
-      ? `<table class="m06"><thead><tr><th>Calibración</th><th>CVN</th></tr></thead><tbody>${e.calibraciones.map((c) => `<tr><td>${esc(c.id || '—')}</td><td class="num">${esc(c.cvn || '—')}</td></tr>`).join('')}</tbody></table>` : '';
+      ? `<table class="m06"><thead><tr><th>Calibración</th><th>CVN</th><th>Resultado</th></tr></thead><tbody>${e.calibraciones.map((c, i) => `<tr><td>${esc(c.id || '—')}</td><td class="num">${esc(c.cvn || '—')}</td>
+          <td>${htmlCvn(c)}${c.id && c.cvn && c.verif?.estado !== 'ok' && puede('diag.actualizar') ? ` <button class="enlace peq" data-cvn-ref="${esc(e.ecu)}|${i}">Es original de fábrica</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '';
     const ipt = e.ipt?.monitores?.filter((x) => x.condiciones).length
       ? `<p class="peq">Ciclos de conducción válidos: <strong>${e.ipt.ciclosObd}</strong> · arranques: ${e.ipt.arranques}</p>
         <table class="m06"><thead><tr><th>Monitor</th><th>Terminado / condiciones</th><th>Ratio</th></tr></thead><tbody>
@@ -935,7 +949,30 @@ function htmlModo09() {
     if (!cal && !ipt && !e.serie) return '';
     return `<h3>${esc(e.nombre || e.modulo)} <small class="suave">${esc(e.ecu)}</small></h3>${e.serie ? `<p class="peq">Nº de serie: ${esc(e.serie)}</p>` : ''}${cal}${ipt}`;
   }).join('');
-  return `${cab}${bloques ? `<div class="tabla-scroll">${bloques}</div><p class="peq suave">Ratio orientativo: por debajo de 0,336 (ámbar) el monitor termina poco; por debajo de 0,1 (rojo), casi nunca.</p>` : '<p>El coche no da estos datos.</p>'}${boton}`;
+  const avisoCvn = m.cvnError ? `<p class="peq peligro-txt">No se pudo comprobar el CVN: ${esc(m.cvnError)}</p>` : '';
+  return `${cab}${bloques ? `<div class="tabla-scroll">${bloques}</div>${avisoCvn}<p class="peq suave"><strong>CVN:</strong> verde, coincide con la referencia (original de fábrica o el mismo en otros coches con ese software); rojo, distinto de la referencia o ha cambiado desde una lectura anterior de este coche; gris, primera vez que se lee ese software. Un programador que respete el CVN original no se detecta así.</p><p class="peq suave">Ratio orientativo: por debajo de 0,336 (ámbar) el monitor termina poco; por debajo de 0,1 (rojo), casi nunca.</p>` : '<p>El coche no da estos datos.</p>'}${boton}`;
+}
+
+const TXT_CVN = { ok: 'No modificado', mal: 'Modificado', dudoso: 'Dudoso', sin_ref: 'Sin referencia' };
+function htmlCvn(c) {
+  const v = c.verif;
+  if (!v) return '<span class="peq suave">—</span>';
+  return `<span class="cvn-res cvn-${v.estado}" title="${esc(v.motivo)}">${TXT_CVN[v.estado] || v.estado}</span><div class="peq suave">${esc(v.motivo)}</div>`;
+}
+
+/** Compara los CVN leídos con las referencias del servidor y apunta esta lectura. */
+async function comprobarCvn(m) {
+  const vin = estado.lectura?.vehiculo?.valido ? estado.lectura.vehiculo.vin : estado.lectura?.uds?.vin;
+  const items = m.ecus.flatMap((e) => (e.calibraciones || []).filter((c) => c.id && c.cvn).map((c) => ({ ecu: e.ecu, calid: c.id, cvn: c.cvn })));
+  if (!items.length) return;
+  if (!vin) { m.cvnError = 'sin bastidor (VIN) no se puede comparar.'; return; }
+  try {
+    const r = await api.comprobarCvn({ vin, matricula: estado.ot?.matricula || null, items });
+    for (const e of m.ecus) for (const c of e.calibraciones || []) {
+      const x = r.resultados.find((y) => y.ecu === e.ecu && y.calid.replace(/\s+/g, ' ').toUpperCase() === String(c.id).replace(/\s+/g, ' ').trim().toUpperCase());
+      if (x) c.verif = { estado: x.estado, motivo: x.motivo };
+    }
+  } catch (err) { m.cvnError = err.message; }
 }
 
 async function leerModo09() {
@@ -944,7 +981,10 @@ async function leerModo09() {
   const pintar = () => { const s = $('#m09'); if (s) s.innerHTML = htmlModo09(); };
   const paso = (t) => { estado.m09Ocupado = t; pintar(); estadoBarra(t, 'busy'); };
   try {
-    estado.modo09 = await estado.obd.modo09(paso);
+    const m = await estado.obd.modo09(paso);
+    paso('Comprobando si el software es el original…');
+    await comprobarCvn(m);
+    estado.modo09 = m;
   } catch (e) {
     estado.modo09 = { fecha: new Date().toISOString(), error: e.message, ecus: [] };
   } finally {

@@ -34,10 +34,12 @@ export function htmlInforme(l, { version = 'interno', taller = {}, logo = '' } =
   // Servicio 09 (solo informe del taller): calibraciones con CVN y monitores que casi nunca terminan
   const m09 = !cliente && l.modo09?.ecus?.length ? l.modo09 : null;
   const seccion09 = m09 ? (() => {
-    const cal = m09.ecus.flatMap((e) => (e.calibraciones || []).map((c) => `<tr><td>${esc(e.nombre || e.modulo)}</td><td>${esc(c.id || '—')}</td><td>${esc(c.cvn || '—')}</td></tr>`)).join('');
+    const TXT = { ok: 'No modificado', mal: 'MODIFICADO', dudoso: 'Dudoso', sin_ref: 'Sin referencia' };
+    const COL = { ok: '#1e8a4c', mal: '#c4302a', dudoso: '#b97f00', sin_ref: '#66717f' };
+    const cal = m09.ecus.flatMap((e) => (e.calibraciones || []).map((c) => `<tr><td>${esc(e.nombre || e.modulo)}</td><td>${esc(c.id || '—')}</td><td>${esc(c.cvn || '—')}</td><td>${c.verif ? `<b style="color:${COL[c.verif.estado]}">${TXT[c.verif.estado]}</b>` : '—'}</td></tr>`)).join('');
     const bajos = m09.ecus.flatMap((e) => (e.ipt?.monitores || []).filter((x) => x.condiciones && x.ratio < 0.336).map((x) => `<li>${esc(x.nombre)}: ${x.completado} de ${x.condiciones} (${esc(x.ratio)})</li>`)).join('');
     if (!cal && !bajos) return '';
-    return `<h2>Calibraciones y uso de los monitores</h2>${cal ? `<table><thead><tr><th>Centralita</th><th>Calibración</th><th>CVN</th></tr></thead><tbody>${cal}</tbody></table>` : ''}${bajos ? `<p>Monitores que terminan poco:</p><ul>${bajos}</ul>` : ''}`;
+    return `<h2>Calibraciones y uso de los monitores</h2>${cal ? `<table><thead><tr><th>Centralita</th><th>Calibración</th><th>CVN</th><th>Software</th></tr></thead><tbody>${cal}</tbody></table>` : ''}${bajos ? `<p>Monitores que terminan poco:</p><ul>${bajos}</ul>` : ''}`;
   })() : '';
   const monitores = (rd.monitores || []).map((m) => `<li>${esc(m.nombre)}: <b>${m.estado === 'ok' ? 'completado' : 'pendiente'}</b></li>`).join('');
   const ff = l.freezeFrame?.dtc && !cliente

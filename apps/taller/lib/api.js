@@ -1,6 +1,8 @@
 // Reyman Diag · Cliente de la API del servidor
 // En modo demostración (sin servidor) usa un servidor simulado en memoria con datos de ejemplo.
 
+import { evaluarCvn, norm as normCvn, normCalid } from '@reyman/obd-core/cvn.js';
+
 export function crearApi({ demo = false } = {}) {
   return demo ? apiDemo() : apiReal();
 }
@@ -32,6 +34,8 @@ function apiReal() {
     guardarSesion: (s) => pedir('POST', '/api/sesiones', s),
     listarSesiones: (q = {}) => pedir('GET', `/api/sesiones?${new URLSearchParams(Object.entries(q).filter(([, v]) => v))}`),
     obtenerSesion: (id) => pedir('GET', `/api/sesiones/${encodeURIComponent(id)}`),
+    comprobarCvn: (d) => pedir('POST', '/api/cvn/comprobar', d),
+    referenciaCvn: (d) => pedir('POST', '/api/cvn/referencia', d),
     enviarInforme: (d) => pedir('POST', '/api/informes/enviar', d),
     diagnosticoIa: (d) => pedir('POST', '/api/ia/diagnostico', d),
     urlInforme: (id) => `/api/lecturas/${id}/informe.pdf`,
@@ -40,7 +44,8 @@ function apiReal() {
 
 function apiDemo() {
   const espera = (ms = 250) => new Promise((r) => setTimeout(r, ms));
-  const mem = { lecturas: [], borrados: [], sesiones: [sesionDemo()], iaGastado: 1.84 };
+  const mem = { lecturas: [], borrados: [], sesiones: [sesionDemo()], iaGastado: 1.84, cvnRef: {},
+    cvn: [{ calid: '04L906056KT 452', cvn: '5A3C91E2', vin: 'WVWZZZAUZJW000001', primera: new Date('2026-10-02') }, { calid: '04L906056KT 452', cvn: '5A3C91E2', vin: 'WVWZZZAUZKW000002', primera: new Date('2026-10-20') }] };
   const OTS = [
     { ot: '261402', matricula: '4521KLM', vin: 'WVWZZZAUZHW512345', cliente: 'Cliente de ejemplo 1', vehiculo: 'Volkswagen Golf 2.0 TDI', situacion: 'En taller', mecanico: 'Bryhan' },
     { ot: '261415', matricula: '7788LKD', vin: 'VSSZZZKLZMR024680', cliente: 'Cliente de ejemplo 2', vehiculo: 'SEAT León 1.5 TSI', situacion: 'Pendiente de diagnosis', mecanico: 'Alex' },
@@ -73,6 +78,20 @@ function apiDemo() {
       const lista = mem.sesiones.filter((s) => (!q || s.matricula === q) && (!ot || s.ot === ot));
       return { sesiones: lista.map(({ muestras, pids, ...x }) => ({ ...x, num_muestras: muestras.length, datos: pids.map((p) => p.nombre), con_datos: true })) };
     },
+    // CVN: misma lógica que el servidor, en memoria (con un coche de ejemplo con el mismo software que el simulador)
+    async comprobarCvn({ vin, items }) {
+      await espera(150);
+      return { resultados: (items || []).map((x0) => {
+        const x = { ecu: x0.ecu, calid: normCalid(x0.calid), cvn: normCvn(x0.cvn) };
+        const filas = mem.cvn.filter((r) => r.calid === x.calid);
+        const por = new Map();
+        for (const r of filas.filter((r) => r.vin !== vin)) por.set(r.cvn, (por.get(r.cvn) || new Set()).add(r.vin));
+        const r = { ...x, ...evaluarCvn(x, { ref: mem.cvnRef[x.calid], propias: filas.filter((f) => f.vin === vin), otros: [...por].map(([cvn, v]) => ({ cvn, coches: v.size })) }) };
+        if (!filas.some((f) => f.vin === vin && f.cvn === x.cvn)) mem.cvn.push({ ...x, vin, primera: new Date() });
+        return r;
+      }) };
+    },
+    async referenciaCvn({ calid, cvn }) { await espera(100); mem.cvnRef[normCalid(calid)] = { cvn: normCvn(cvn), creada: new Date() }; return { ok: true }; },
     async obtenerSesion(i) { await espera(150); const s = mem.sesiones.find((x) => x.id === i); if (!s) throw new Error('Grabación no encontrada.'); return s; },
     async guardarSesion(s) { await espera(); const nuevo = id(); mem.sesiones.unshift({ ...s, id: nuevo, usuario: 'Mecánico (demo)', num_muestras: s.muestras.length, creada: new Date().toISOString() }); return { id: nuevo, destino: `se ve en «Datos grabados» y esta noche se copia a OneDrive (DIAGNOSIS OBD/${new Date().getFullYear()}/${s.ot ? `1-A-${s.ot}` : 'SIN OT'} ${s.matricula || ''})` }; },
     async enviarInforme(d) { await espera(600); return { ok: true, enviadoA: d.email, desde: 'talleresreyman@gmail.com', demo: true }; },

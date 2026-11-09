@@ -10,6 +10,7 @@ import { buscarOts, enviarCorreo, diagnosticoIa } from './integraciones.js';
 import { pdfInforme } from './pdf.js';
 import { buscarTaller, fichaPublica, TALLERES_CONNECT } from './connect-talleres.js';
 import { desdeSesion, aCsv as visorCsv } from '../packages/obd-core/src/visor.js';
+import { evaluarCvn, norm as normCvn, normCalid } from '../packages/obd-core/src/cvn.js';
 
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -249,6 +250,32 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     });
     const ruta = rutaOneDrive({ ot: b.ot, matricula: limpiarMat(b.matricula), vin: b.vin, inicio: b.inicio || new Date() });
     return { id: r.id, destino: `se ve en «Datos grabados» y esta noche se copia a OneDrive (${ruta.carpeta.replace(/^01_TALLERES REYMAN\//, '')})` };
+  });
+
+  // --- CVN: ¿software original? (servicio 09) ---
+  app.post('/api/cvn/comprobar', { preHandler: exigir('diag.leer') }, async (req, rep) => {
+    const b = req.body || {};
+    const vin = String(b.vin || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (vin.length !== 17) return rep.code(400).send({ error: 'Hace falta el bastidor (VIN) para comparar el CVN.' });
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 40)
+      .map((x) => ({ ecu: String(x.ecu || '').slice(0, 20), calid: normCalid(x.calid), cvn: normCvn(x.cvn) }))
+      .filter((x) => x.calid && x.cvn);
+    const out = [];
+    for (const x of items) {
+      const datos = await store.cvnDatos(req.s.tenant, x.calid, vin);
+      out.push({ ...x, ...evaluarCvn({ ...x, vin }, datos) });
+      await store.cvnApuntar(req.s.tenant, { ...x, vin, matricula: limpiarMat(b.matricula) });
+    }
+    return { resultados: out };
+  });
+  app.post('/api/cvn/referencia', { preHandler: exigir('diag.actualizar') }, async (req, rep) => {
+    const b = req.body || {};
+    const calid = normCalid(b.calid);
+    const cvn = normCvn(b.cvn);
+    if (!calid || !cvn) return rep.code(400).send({ error: 'Faltan la calibración o el CVN.' });
+    await store.cvnReferencia(req.s.tenant, { calid, cvn, usuario: req.s.usuario.nombre, vin: b.vin || null });
+    await store.auditar(req.s.tenant, { usuario: req.s.usuario.nombre, accion: 'cvn_referencia', detalle: { calid, cvn, vin: b.vin || null }, ip: ip(req) });
+    return { ok: true };
   });
 
   // --- visor de grabaciones ---

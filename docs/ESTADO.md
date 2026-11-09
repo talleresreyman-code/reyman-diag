@@ -104,8 +104,15 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Modo demostración con una prueba de carretera de ejemplo (tirón a 1:35).
 - **Copia a OneDrive** (flujo n8n «Reyman Diag · copia nocturna de grabaciones a OneDrive», id MU5hnh7TBvDlrQE2): cada noche a las 02:47 pide `http://reyman-diag:3020/api/ingest/sesiones` (red interna de Docker, cabecera `x-api-key` = `DIAG_INGEST_KEY` del `.env` del VPS, credencial n8n «Reyman Diag (copia a OneDrive)»), sube cada CSV (formato Excel, con marcas) a `01_TALLERES REYMAN/DIAGNOSIS OBD/<año>/1-A-<OT> <matrícula>/AAAAMMDD_HHMM_Prueba de carretera_<matrícula>.csv` (sin OT: `SIN OT/<matrícula>`) y la marca como copiada. Sin IA, sin coste.
 
+### 15. ¿Software original? Resultado del CVN → v0.4.9 (09/11/2026)
+- En Pre-ITV, al leer el servicio 09, cada calibración (CALID) sale con **No modificado** (verde), **Modificado** (rojo), **Dudoso** (ámbar) o **Sin referencia** (gris), también en el informe del taller.
+- La lista oficial de CVN de los fabricantes no es pública, así que la referencia sale de (por orden): una referencia «original de fábrica» marcada a mano (botón «Es original de fábrica», solo administración, `diag.actualizar`); el mismo coche leído antes (si el CVN ha cambiado → modificado); otros coches del taller con el mismo software (igual → verde; distinto de 2 o más coches → rojo; mezcla → dudoso). Cada lectura se apunta (`diag_cvn`, `diag_cvn_ref`, migración 004).
+- Lógica en `packages/obd-core/src/cvn.js`; `POST /api/cvn/comprobar` y `POST /api/cvn/referencia`.
+- Límite: un programador que deja el CVN original no se detecta por este método.
+- Enlace (`puente.ps1`): vuelto a la versión probada sin el reinicio automático al cambiar de interfaz; «Iniciar Reyman Diag» apunta en `enlace.log` cada arranque y no cierra la ventana si el programa se para.
+
 ### Pruebas
-- **97 pruebas automáticas.**
+- **101 pruebas automáticas.**
 
 ## Pendiente
 

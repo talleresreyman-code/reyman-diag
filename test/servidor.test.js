@@ -111,3 +111,13 @@ test('sirve la interfaz', async () => {
   assert.equal(r.statusCode, 200);
   assert.match(r.body, /Reyman Diag/);
 });
+
+test('CVN: se apunta, se compara con otros coches y la referencia de fábrica solo la pone administración', async () => {
+  const pedir = (vin, cvn, rol = 'mecanico') => app.inject({ method: 'POST', url: '/api/cvn/comprobar', headers: H(rol), payload: { vin, items: [{ ecu: '7E8', calid: '5G0259N  0003BECD', cvn }] } });
+  assert.equal((await pedir('WVWZZZAAAAA000001', 'BCDF02EB')).json().resultados[0].estado, 'sin_ref');
+  assert.equal((await pedir('WVWZZZAAAAA000002', 'BCDF02EB')).json().resultados[0].estado, 'ok');
+  assert.equal((await pedir('WVWZZZAAAAA000003', '12345678')).json().resultados[0].estado, 'mal');
+  assert.equal((await pedir('WVWZZZAAAAA000001', '0BADBEEF')).json().resultados[0].motivo.includes('Ha cambiado'), true);
+  assert.equal((await app.inject({ method: 'POST', url: '/api/cvn/referencia', headers: H('mecanico'), payload: { calid: '5G0259N 0003BECD', cvn: '12345678' } })).statusCode, 403);
+  assert.equal((await pedir('corto', 'BCDF02EB')).statusCode, 400);
+});
