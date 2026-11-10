@@ -54,7 +54,7 @@ Para probar sin coche, usa la opción **Simulador**: tres coches (diésel con EG
 2. `deploy/instalar.sh` crea el `.env` con contraseñas aleatorias. Rellena las claves y ejecútalo otra vez.
 3. DNS: registro `diag` → IP del VPS (Dinahosting). Proxy con `deploy/nginx-diag.conf` y certificado HTTPS. Web Bluetooth **exige HTTPS**.
 4. Cambios en la App Reyman y en n8n: ver `docs/INTEGRACION.md`.
-5. Para actualizar: `deploy/actualizar.sh`.
+5. Para actualizar: `deploy/actualizar.sh` (antes hace copia de la base en `copias/`, guarda las 10 últimas). Restaurar: `deploy/restaurar-copia.sh`.
 
 ## Seguridad y registros
 

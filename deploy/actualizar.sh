@@ -2,6 +2,9 @@
 # Reyman Diag · publicar la última versión de GitHub (rama main)
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# 1) Copia de seguridad de la base antes de tocar nada (copias/diag_AAAAMMDD_HHMMSS.dump, se guardan las 10 últimas).
+#    Si la copia falla, no se actualiza. En la primera instalación (base aún sin arrancar) no hay nada que copiar.
+bash deploy/copia-base.sh
 if [ "${1:-}" != "--sin-git" ]; then
   git fetch -q origin main
   git reset -q --hard origin/main

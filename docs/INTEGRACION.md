@@ -56,7 +56,10 @@ Flujo «Reyman Diag · sesiones a OneDrive». Cada noche a las 4:27 (escalonado 
 
 ## 5. Copia de seguridad
 
-Añadir la base `diag` al flujo «App Reyman · copia diaria a OneDrive». La alternativa es un `pg_dump` en cron: `docker compose exec -T db pg_dump -U diag -Fc diag > copia.dump`.
+- Cada actualización (`deploy/actualizar.sh`, también el botón «Actualizar») hace antes una copia con `deploy/copia-base.sh` en `/opt/reyman-diag/copias/diag_AAAAMMDD_HHMMSS.dump` y guarda las 10 últimas. Si la copia falla, no actualiza.
+- Copia a mano: `cd /opt/reyman-diag && bash deploy/copia-base.sh`.
+- Restaurar: `bash deploy/restaurar-copia.sh` lista las copias; `bash deploy/restaurar-copia.sh copias/<archivo>.dump` restaura (pide escribir SI y antes copia el estado actual).
+- Pendiente: llevar también la base `diag` al flujo «App Reyman · copia diaria a OneDrive» (las copias del VPS no protegen si se pierde el VPS).
 
 ## 6. IA
 
