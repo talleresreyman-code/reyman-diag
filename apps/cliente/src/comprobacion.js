@@ -7,6 +7,9 @@ import { gravedad } from '@reyman/obd-core/obd/gravedad.js';
 import { evaluarTension, detectarSituacion } from '@reyman/obd-core/bateria.js';
 import { crearTransporteBle, bleDisponible } from '@reyman/obd-core/transport/ble.js';
 import { crearTransporteBleNativo } from '@reyman/obd-core/transport/ble-nativo.js';
+import { crearTransporteWifiNativo, WIFI_NATIVO_POR_DEFECTO } from '@reyman/obd-core/transport/wifi-nativo.js';
+
+export { WIFI_NATIVO_POR_DEFECTO };
 import { crearSimulador } from '@reyman/obd-core/transport/simulador.js';
 
 export const esNativa = () => !!globalThis.Capacitor?.isNativePlatform?.();
@@ -17,11 +20,16 @@ export function formasDeConectar() {
 }
 
 /**
- * Crea el transporte adecuado: Bluetooth nativo en la app, Bluetooth web en Chrome, o el simulador.
- * @param {object} op { simulador: 'diesel'|..., adaptador: {deviceId, nombre}, alElegir }
+ * Crea el transporte adecuado: Wi-Fi o Bluetooth nativos en la app, Bluetooth web en Chrome, o el simulador.
+ * @param {object} op { simulador: 'diesel'|..., conexion: {tipo:'ble'|'wifi', host, puerto}, adaptador: {deviceId, nombre}, alElegir }
  */
 export async function crearTransporte(op = {}) {
   if (op.simulador) return crearSimulador({ coche: op.simulador, motor: op.motor || 'parado', bateria: op.bateria });
+  if (op.conexion?.tipo === 'wifi') {
+    if (!esNativa()) throw Object.assign(new Error('La conexión Wi-Fi con el adaptador solo funciona en la app Reyman Connect instalada.'), { code: 'SIN_WIFI' });
+    const { TcpSocket } = await import('capacitor-tcp-socket');
+    return crearTransporteWifiNativo({ TcpSocket, host: op.conexion.host, puerto: op.conexion.puerto });
+  }
   if (esNativa()) {
     const { BleClient } = await import('@capacitor-community/bluetooth-le');
     return crearTransporteBleNativo({ BleClient, deviceId: op.adaptador?.deviceId, nombre: op.adaptador?.nombre, alElegir: op.alElegir });

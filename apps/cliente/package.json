@@ -1,6 +1,6 @@
 {
   "name": "reyman-connect",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Reyman Connect · app de cliente (iPhone y Android) con adaptador OBD Bluetooth. Usa el núcleo OBD común de packages/obd-core.",
@@ -16,7 +16,8 @@
     "@capacitor/android": "^8.6.0",
     "@capacitor/core": "^8.6.0",
     "@capacitor/ios": "^8.6.0",
-    "@capacitor/preferences": "^8.0.1"
+    "@capacitor/preferences": "^8.0.1",
+    "capacitor-tcp-socket": "^8.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.0",

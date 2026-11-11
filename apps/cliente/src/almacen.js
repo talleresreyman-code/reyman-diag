@@ -14,6 +14,7 @@ export const DATOS_INICIALES = {
   ajustes: { tipoBateria: 'normal' },
   taller: null, // { codigo, ficha, consentimiento: { version, fecha } }
   adaptador: null, // { deviceId, nombre } para reconectar sin buscar
+  conexion: { tipo: 'ble' }, // 'ble' (Bluetooth) o 'wifi' con { host, puerto } (WiCAN Pro: 192.168.0.10:35000)
 };
 
 let memoria = null;

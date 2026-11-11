@@ -25,6 +25,12 @@ npm run demo         # dist/reyman-connect-demo.html: un solo archivo, modo demo
 
 La demo se abre en cualquier navegador. En Chrome de Android o del ordenador, `www/index.html` servido por HTTPS también conecta con un adaptador por Bluetooth web.
 
+## Android sin Android Studio (GitHub Actions)
+
+El flujo `.github/workflows/connect-android.yml` compila el APK de pruebas en GitHub cada vez que cambia la app o el núcleo (o a mano desde Actions). El APK sale como artefacto `Reyman_Connect_vX.Y.Z_android` y se instala en el móvil o la tablet Android (permitir «instalar apps de origen desconocido»).
+
+`scripts/preparar-nativo.mjs android|ios` añade los permisos de Bluetooth y red local a los proyectos nativos después de `npx cap add`.
+
 ## Sacar la app en Android e iPhone (Capacitor)
 
 Hace falta **Android Studio** (para Android) y un **Mac con Xcode** (para iPhone). Las plataformas nativas no están en el repositorio: se crean una vez.
@@ -56,18 +62,24 @@ Comprobar contra el README del plugin `@capacitor-community/bluetooth-le` de la 
 
 La app no usa la ubicación (`androidNeverForLocation: true`).
 
-**iPhone** (`ios/App/App/Info.plist`):
+**iPhone / iPad** (`ios/App/App/Info.plist`, lo pone `preparar-nativo.mjs ios`):
 
 ```xml
 <key>NSBluetoothAlwaysUsageDescription</key>
 <string>Reyman Connect usa el Bluetooth para conectar con el adaptador OBD de tu coche.</string>
+<key>NSLocalNetworkUsageDescription</key>
+<string>Reyman Connect se conecta por Wi-Fi con el adaptador OBD de tu coche (por ejemplo, WiCAN Pro).</string>
 ```
+
+Para instalarla en un iPhone o iPad hace falta la cuenta de desarrollador de Apple (99 €/año) y compilarla en un Mac (o en un Mac de GitHub Actions) para subirla a TestFlight.
 
 ## Adaptadores
 
-- Tiene que ser **Bluetooth LE** (el Bluetooth clásico no funciona en iPhone). Probados en el simulador: vLinker (servicio Vgate) y ELM327 BLE genéricos (`FFF0`, `FFE0`, `18F0`).
-- **WiCAN Pro:** cuando llegue, comprobar su servicio BLE y añadirlo a `SERVICIOS_BLE` en `packages/obd-core/src/transport/ble-nativo.js` si no es uno de los anteriores.
-- La app recuerda el adaptador elegido para no buscarlo cada vez.
+En «Inicio → Adaptador · Cambiar» se elige **Bluetooth** o **Wi-Fi**.
+
+- **Bluetooth LE** (el Bluetooth clásico no funciona en iPhone): vLinker (servicio Vgate), WiCAN / WiCAN Pro (`FEE0`) y ELM327 BLE genéricos (`FFF0`, `FFE0`, `18F0`). La app recuerda el adaptador elegido.
+- **Wi-Fi** (solo en la app instalada, plugin `capacitor-tcp-socket`): socket TCP directo con el adaptador, sin portátil. WiCAN Pro: `192.168.0.10`, puerto `35000`. El móvil tiene que estar conectado a la red del adaptador (`WiCAN_…`, clave de fábrica `@meatpi#`).
+- **WiCAN Pro**, en su página de configuración (`192.168.0.10`): protocolo **ELM327**. Para Bluetooth, activar BLE (clave de emparejado de fábrica `123456`); para Wi-Fi, mejor con BLE desactivado.
 
 ## Servidor
 

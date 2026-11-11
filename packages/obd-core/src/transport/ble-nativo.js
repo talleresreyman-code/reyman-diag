@@ -5,9 +5,12 @@
 
 const uuid16 = (n) => `0000${n.toString(16).padStart(4, '0')}-0000-1000-8000-00805f9b34fb`;
 
-// Servicios conocidos de adaptadores ELM327 BLE. Ampliar con el del WiCAN Pro cuando se compruebe en el aparato.
+// Servicios conocidos de adaptadores ELM327 BLE.
+// WiCAN y WiCAN Pro (firmware de MeatPi): servicio FEE0; hay que activar BLE y el protocolo ELM327 en su página
+// de configuración, y el sistema pide emparejar con su clave (de fábrica 123456).
 export const SERVICIOS_BLE = [
   'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Vgate vLinker / iCar
+  uuid16(0xfee0), // WiCAN / WiCAN Pro
   uuid16(0xfff0), // ELM327 BLE genéricos
   uuid16(0xffe0), // módulos tipo HM-10
   uuid16(0x18f0), // OBDLink / otros

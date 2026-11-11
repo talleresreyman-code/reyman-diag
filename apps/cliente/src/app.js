@@ -3,7 +3,7 @@
 // Los datos se guardan en el móvil; solo salen hacia el taller si el cliente lo vincula y lo acepta.
 
 import { cargar, guardar, borrarTodo } from './almacen.js';
-import { crearTransporte, conectar, comprobarCoche, formasDeConectar, esNativa } from './comprobacion.js';
+import { crearTransporte, conectar, comprobarCoche, formasDeConectar, esNativa, WIFI_NATIVO_POR_DEFECTO } from './comprobacion.js';
 import { peorGravedad, NIVELES } from '@reyman/obd-core/obd/gravedad.js';
 import { evaluarTension, medirArranque, HistorialBateria, avisosBateria, TIPOS_BATERIA, evaluarReposo } from '@reyman/obd-core/bateria.js';
 import { estadoMantenimiento, kmActuales } from '@reyman/obd-core/mantenimiento.js';
@@ -103,7 +103,7 @@ function log() {}
 
 async function asegurarConexion(opDemo = {}) {
   if (st.sesion) return st.sesion;
-  const op = DEMO ? { simulador: st.datos.demoCoche || 'diesel', ...opDemo } : { adaptador: st.datos.adaptador, alElegir: (d) => { st.datos.adaptador = { deviceId: d.deviceId, nombre: d.name }; } };
+  const op = DEMO ? { simulador: st.datos.demoCoche || 'diesel', ...opDemo } : { conexion: st.datos.conexion, adaptador: st.datos.adaptador, alElegir: (d) => { st.datos.adaptador = { deviceId: d.deviceId, nombre: d.name }; } };
   const transporte = await crearTransporte(op);
   st.sesion = await conectar(transporte, { log });
   transporte.alDesconectarse?.(() => { st.sesion = null; pintar(); toast('Se ha perdido la conexión con el adaptador.'); });
@@ -118,7 +118,8 @@ async function desconectar() {
 }
 
 function mensajeError(e) {
-  if (e?.code === 'SIN_BLUETOOTH') return e.message;
+  if (e?.code === 'SIN_BLUETOOTH' || e?.code === 'SIN_WIFI') return e.message;
+  if (st.datos.conexion?.tipo === 'wifi') return `${e?.message || 'Error desconocido'}${e?.code === 'SIN_ADAPTADOR' ? '' : '. Comprueba que estás conectado a la red Wi-Fi del adaptador y que el contacto está puesto.'}`;
   if (e?.code === 'SIN_VEHICULO') return e.message;
   if (/cancel/i.test(e?.message || '') || e?.name === 'NotFoundError') return null;
   return `${e?.message || 'Error desconocido'}. Comprueba que el adaptador está enchufado, que el contacto está puesto y que el Bluetooth del móvil está activado.`;
@@ -226,6 +227,7 @@ function vInicio() {
       <button class="btn grande" id="comprobar" ${st.ocupado ? 'disabled' : ''}>${I.bt} ${st.sesion ? 'Comprobar de nuevo' : 'Comprobar mi coche'}</button>
       ${!st.sesion && !st.ocupado ? `<p class="peq suave centrado">${DEMO ? 'Modo demostración: usa un coche simulado.' : 'Enchufa el adaptador en la toma OBD (bajo el volante) y pon el contacto.'}</p>` : ''}
       ${st.sesion ? '<button class="enlace centrado" id="desconectar">Desconectar el adaptador</button>' : ''}
+      ${!DEMO ? `<p class="peq suave centrado">Adaptador: ${esc(textoConexion())} · <button class="enlace" id="adaptador">Cambiar</button></p>` : ''}
     </section>
     ${bloqueOcupado()}
     <section class="fichas">
@@ -247,8 +249,40 @@ function eInicio(el) {
   $('#desconectar', el)?.addEventListener('click', desconectar);
   el.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', () => { st.vista = b.dataset.ir; pintar(); window.scrollTo(0, 0); }));
   el.querySelectorAll('#mat-editar').forEach((b) => b.addEventListener('click', dialogoCoche));
+  $('#adaptador', el)?.addEventListener('click', dialogoAdaptador);
   $('#demo-coche', el)?.addEventListener('change', async (e) => { st.datos.demoCoche = e.target.value; await desconectar(); await persistir(); toast('Coche simulado cambiado.'); });
   $('#demo-reset', el)?.addEventListener('click', async () => { await borrarTodo(); st.datos = await cargar(); await desconectar(); toast('Datos borrados.'); });
+}
+
+function textoConexion() {
+  const c = st.datos.conexion || { tipo: 'ble' };
+  if (c.tipo === 'wifi') return `Wi-Fi ${c.host || WIFI_NATIVO_POR_DEFECTO.host}`;
+  return st.datos.adaptador?.nombre ? `Bluetooth (${st.datos.adaptador.nombre})` : 'Bluetooth';
+}
+
+// Bluetooth (vLinker, WiCAN Pro con BLE, ELM327 BLE) o Wi-Fi (WiCAN Pro, ELM327 Wi-Fi)
+function dialogoAdaptador() {
+  const c = st.datos.conexion || { tipo: 'ble' };
+  const d = dialogo(`<h2>Adaptador</h2>
+    <label class="check"><input type="radio" name="a-tipo" value="ble" ${c.tipo !== 'wifi' ? 'checked' : ''}> <span><strong>Bluetooth</strong><br><span class="peq suave">vLinker, WiCAN Pro con Bluetooth activado (clave 123456) u otro ELM327 Bluetooth LE.</span></span></label>
+    <label class="check"><input type="radio" name="a-tipo" value="wifi" ${c.tipo === 'wifi' ? 'checked' : ''}> <span><strong>Wi-Fi</strong><br><span class="peq suave">WiCAN Pro u otro ELM327 Wi-Fi. Antes, conecta el móvil a la red Wi-Fi del adaptador (WiCAN_…).</span></span></label>
+    <div id="a-wifi" ${c.tipo === 'wifi' ? '' : 'hidden'}>
+      <label class="campo"><span>Dirección</span><input id="a-host" value="${esc(c.host || WIFI_NATIVO_POR_DEFECTO.host)}" inputmode="decimal"></label>
+      <label class="campo"><span>Puerto</span><input id="a-puerto" value="${esc(c.puerto || WIFI_NATIVO_POR_DEFECTO.puerto)}" inputmode="numeric"></label>
+    </div>
+    ${st.datos.adaptador ? `<p class="peq suave">Bluetooth recordado: ${esc(st.datos.adaptador.nombre || 'adaptador')} · <button class="enlace" id="a-olvidar" type="button">Olvidar</button></p>` : ''}
+    <div class="fila-btn"><button class="btn fantasma" value="cancel">Cancelar</button><button class="btn" id="a-ok" value="ok">Guardar</button></div>`);
+  d.querySelectorAll('[name="a-tipo"]').forEach((r) => r.addEventListener('change', () => { $('#a-wifi', d).hidden = d.querySelector('[name="a-tipo"]:checked').value !== 'wifi'; }));
+  $('#a-olvidar', d)?.addEventListener('click', async () => { st.datos.adaptador = null; await persistir(); toast('Adaptador Bluetooth olvidado: la próxima vez se buscará de nuevo.'); d.close(); pintar(); });
+  $('#a-ok', d).addEventListener('click', async () => {
+    const tipo = d.querySelector('[name="a-tipo"]:checked').value;
+    st.datos.conexion = tipo === 'wifi'
+      ? { tipo, host: $('#a-host', d).value.trim() || WIFI_NATIVO_POR_DEFECTO.host, puerto: Number($('#a-puerto', d).value) || WIFI_NATIVO_POR_DEFECTO.puerto }
+      : { tipo: 'ble' };
+    await desconectar();
+    await persistir();
+    pintar();
+  });
 }
 
 function dialogoCoche() {
@@ -608,6 +642,7 @@ async function enviarAlTaller(tipo, extra = {}) {
 // ---------------------------------------------------------------------------
 async function iniciar() {
   st.datos = await cargar();
+  if (!st.datos.conexion) st.datos.conexion = { tipo: 'ble' };
   if (!DEMO && !esNativa() && !formasDeConectar().webBle) st.error = 'Este navegador no permite Bluetooth. Usa la app Reyman Connect o Chrome en Android.';
   pintar();
 }

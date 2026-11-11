@@ -117,8 +117,15 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Destinos: 1) portátil, con el programa de enlace: `REYMAN DIAG\Sesiones de diagnóstico\<sesión>\registro.json, informe-taller.html, informe-cliente.html` (fuera de la carpeta de la versión). Con la V200 o el Wi-Fi conectados el enlace está ocupado, así que ahí se guarda al desconectar. 2) servidor (app online): tabla `diag_registros` (migración 005), `POST /api/registros`; n8n la copia cada noche a OneDrive `DIAGNOSIS OBD/<año>/1-A-<OT> <matrícula>/Sesión <id>/` (Informe taller, Informe cliente, Registro completo); si se vuelve a guardar después de copiarla, se copia otra vez.
 - Enlace: endpoint `POST /guardar` (solo nombres seguros, .json y .html, máx. 60 MB) y al arrancar cierra cualquier otro PowerShell que esté ejecutando un `puente.ps1` (antes no los encontraba porque el puerto lo tiene el proceso System → «conflicto con un registro existente»).
 
+### 17. Reyman Connect 0.2: WiCAN Pro por Wi-Fi y Bluetooth, APK de Android en GitHub (11/11/2026)
+- Han llegado los WiCAN Pro. En el iPad, Reyman Diag (web) no puede conectar con ellos: el navegador no abre sockets TCP ni Bluetooth. Solución: la app instalada (Reyman Connect con Capacitor).
+- Nuevo transporte `transport/wifi-nativo.js` (plugin `capacitor-tcp-socket`): TCP directo con el adaptador desde la app (WiCAN Pro `192.168.0.10:35000`), sin portátil. Probado con un socket falso + simulador.
+- Bluetooth: servicio `FEE0` del WiCAN / WiCAN Pro añadido (firmware MeatPi: características FEE1/FEE3 cifradas, emparejado con clave, de fábrica `123456`; BLE viene desactivado de fábrica).
+- App: «Inicio → Adaptador · Cambiar» para elegir Bluetooth o Wi-Fi (dirección y puerto).
+- APK de pruebas compilado en GitHub Actions (`.github/workflows/connect-android.yml`, `scripts/preparar-nativo.mjs` pone los permisos). iPhone/iPad: pendiente de la cuenta de desarrollador de Apple (99 €/año) para TestFlight.
+
 ### Pruebas
-- **102 pruebas automáticas.**
+- **104 pruebas automáticas.**
 
 ## Pendiente
 

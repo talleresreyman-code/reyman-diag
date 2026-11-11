@@ -5,6 +5,7 @@
 
 const SERVICIOS = [
   'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Vgate vLinker / iCar
+  0xfee0, // WiCAN / WiCAN Pro
   0xfff0, // ELM327 BLE genéricos
   0xffe0, // módulos tipo HM-10
   0x18f0, // OBDLink / otros
