@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
     paths: ['apps/cliente/**', 'packages/obd-core/**', '.github/workflows/connect-android.yml']
+permissions:
+  contents: write
 jobs:
   apk:
     runs-on: ubuntu-latest
@@ -44,3 +46,13 @@ jobs:
           name: Reyman_Connect_v${{ env.VERSION }}_android
           path: apps/cliente/Reyman_Connect_v*.apk
           retention-days: 30
+      # Copia también en la rama «apk» (un solo commit) para poder llevarlo a Drive sin entrar en GitHub
+      - name: Guardar en la rama apk
+        run: |
+          mkdir -p /tmp/apk && cp Reyman_Connect_v*.apk /tmp/apk/
+          cd /tmp/apk
+          git init -q -b apk
+          git config user.name "Reyman Connect CI"
+          git config user.email "ci@talleresreyman.es"
+          git add . && git commit -qm "Reyman Connect v${VERSION} (Android, ${GITHUB_SHA::7})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" apk
