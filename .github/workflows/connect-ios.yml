@@ -1,0 +1,81 @@
+# Reyman Connect · compila la app de iPhone/iPad en un Mac de GitHub (sin Mac propio).
+# Mientras no esté la cuenta de desarrollador de Apple solo comprueba que compila (sin firmar).
+# Cuando estén los secretos de App Store Connect, además firma y la sube a TestFlight.
+#   Secretos (Settings → Secrets and variables → Actions):
+#     ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (contenido del archivo .p8), APPLE_TEAM_ID
+name: Reyman Connect · iOS
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/cliente/**', 'packages/obd-core/**', '.github/workflows/connect-ios.yml']
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    defaults:
+      run:
+        working-directory: apps/cliente
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Xcode más reciente
+        run: |
+          X=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$X"
+          xcodebuild -version
+      - name: Dependencias y web de la app
+        run: |
+          npm ci
+          node scripts/build.js
+      - name: Proyecto iOS
+        run: |
+          npx cap add ios
+          node scripts/preparar-nativo.mjs ios
+          npx cap sync ios
+      - name: Compilar sin firmar (comprobación)
+        if: env.ASC_KEY_ID == ''
+        working-directory: apps/cliente/ios/App
+        run: |
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -40
+          echo "Compila bien. Falta la cuenta de desarrollador de Apple para firmar y subir a TestFlight."
+      - name: Firmar y subir a TestFlight
+        if: env.ASC_KEY_ID != ''
+        working-directory: apps/cliente/ios/App
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$ASC_KEY_P8" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          V=$(node -p "require('../../package.json').version")
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath $RUNNER_TEMP/App.xcarchive \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION=$V CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
+            -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID \
+            archive | tail -40
+          cat > $RUNNER_TEMP/export.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/App.xcarchive \
+            -exportOptionsPlist $RUNNER_TEMP/export.plist -exportPath $RUNNER_TEMP/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
+            -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID | tail -40
+          echo "Subida a TestFlight: versión $V (compilación ${{ github.run_number }})"
