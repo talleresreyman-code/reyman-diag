@@ -122,7 +122,8 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Nuevo transporte `transport/wifi-nativo.js` (plugin `capacitor-tcp-socket`): TCP directo con el adaptador desde la app (WiCAN Pro `192.168.0.10:35000`), sin portátil. Probado con un socket falso + simulador.
 - Bluetooth: servicio `FEE0` del WiCAN / WiCAN Pro añadido (firmware MeatPi: características FEE1/FEE3 cifradas, emparejado con clave, de fábrica `123456`; BLE viene desactivado de fábrica).
 - App: «Inicio → Adaptador · Cambiar» para elegir Bluetooth o Wi-Fi (dirección y puerto).
-- APK de pruebas compilado en GitHub Actions (`.github/workflows/connect-android.yml`, `scripts/preparar-nativo.mjs` pone los permisos). iPhone/iPad: pendiente de la cuenta de desarrollador de Apple (99 €/año) para TestFlight.
+- APK de pruebas compilado en GitHub Actions (`.github/workflows/connect-android.yml`, `scripts/preparar-nativo.mjs` pone los permisos); el APK se guarda también en la rama `apk` (los artefactos de Actions no se pueden descargar desde aquí) y se copia a Drive `REYMAN DIAG\Reyman_Connect_vX.Y.Z`.
+- iPhone/iPad: `.github/workflows/connect-ios.yml` compila en un Mac de GitHub (Xcode 26.6, proyecto SPM). Sin secretos: compila sin firmar (comprobado el 14/11/2026, BUILD SUCCEEDED). Con los secretos `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` y `APPLE_TEAM_ID`: firma automática y subida a TestFlight. José abre la cuenta de desarrollador como particular (14/11/2026); falta crear la app en App Store Connect (`es.talleresreyman.connect`) y la clave de API.
 
 ### Pruebas
 - **104 pruebas automáticas.**
