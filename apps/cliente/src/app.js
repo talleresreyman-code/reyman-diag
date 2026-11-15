@@ -735,6 +735,11 @@ function vTaller() {
   }
   const f = t.ficha;
   return `<h1>Mi taller</h1>
+    <section class="panel">
+      <p><strong>¿Eres cliente de ${esc(f.nombre)}?</strong></p>
+      <p class="peq suave">Con tu enlace personal de WhatsApp verás tus coches, en qué punto está la reparación, tus presupuestos y facturas.</p>
+      <div class="fila-btn col"><button class="btn" id="b-pegar">Pegar mi enlace de WhatsApp</button><a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedir mi enlace por WhatsApp</a></div>
+    </section>
     <section class="panel taller-ficha">
       <h2>${esc(f.nombre)}</h2>${f.marca ? `<p class="suave peq">${esc(f.marca)}</p>` : ''}
       <p>${esc(f.direccion)}</p>

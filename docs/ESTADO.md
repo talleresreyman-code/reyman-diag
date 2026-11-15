@@ -139,6 +139,7 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Enlace que abre la app ya vinculada: `reymanconnect://mitaller?t=…` (esquema dado de alta en iOS y Android con `preparar-nativo.mjs`) desde la página de n8n **«Reyman Connect · abrir la app»** (C6nUi80fw5HKwY3R, `n8n.talleresreyman.es/webhook/reyman-connect?t=…`, sin leer datos, sin coste).
 - Inicio: aviso del estado del coche en el taller («Terminado: puedes pasar a recogerlo», «En reparación»…). Mi taller: presupuestos pendientes (abre `mi-presupuesto`), coches con estado, km, última visita y próxima ITV, documentos PDF, WhatsApp/llamar, enviar estado y pedir cita (como antes). Se refresca al abrir la app y al entrar en Mi taller; la última copia se guarda en el móvil.
 - Código: `apps/cliente/src/cliente.js` (+ `@capacitor/app`, `@capacitor/clipboard`, `@capacitor/browser`). Pruebas: `test/connect-cliente.test.js`.
+- 0.3.2: con el taller ya vinculado por código, Mi taller también ofrece «Pegar mi enlace de WhatsApp» (pasa a ficha completa de cliente).
 - Pendiente: que el WhatsApp con el enlace de Mi taller lleve también el enlace de la app; QR en recepción; fases 2 (libro de mantenimiento) y 3 (citas y avisos).
 
 ### 20. Bastidor por UDS cuando el modo 09 no lo da → v0.4.12 / Connect 0.3.1 (15/11/2026)
