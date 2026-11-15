@@ -314,7 +314,8 @@ export function crearSimulador(opciones = {}) {
       if (mapa[mid]) motor(mapa[mid]);
     } else if (servicio === 0x09) {
       const pid = bytes[1];
-      if (pid === 0x02) motor([0x49, 0x02, 0x01, ...[...coche.vin].map((c) => c.charCodeAt(0))]);
+      // sinVinObd: como algunos PSA, el motor no da el bastidor por el modo 09 (sí por UDS 22 F190)
+      if (pid === 0x02 && !opciones.sinVinObd) motor([0x49, 0x02, 0x01, ...[...coche.vin].map((c) => c.charCodeAt(0))]);
       else if (pid === 0x0a) {
         motor([0x49, 0x0a, 0x01, ...[...'ECM-EngineControl'].map((c) => c.charCodeAt(0)), 0, 0, 0]);
         cambio([0x49, 0x0a, 0x01, ...[...'TCM-TransmisCtrl'].map((c) => c.charCodeAt(0)), 0, 0, 0, 0]);

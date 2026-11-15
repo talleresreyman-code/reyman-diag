@@ -84,7 +84,7 @@ small{color:#66717f}
 <div class="grid">
 <div><small>Matrícula</small>${esc(l.matricula || '—')}</div>
 <div><small>Vehículo</small>${esc(l.descripcionVehiculo || v.marca || '—')}${v.año ? ` (${v.año})` : ''}</div>
-<div><small>Bastidor</small>${esc(v.vin || (l.vehiculo && !l.vehiculo.valido ? 'No lo da por OBD' : '—'))}</div>
+<div><small>Bastidor</small>${esc(v.vin || (l.vinOt ? `${l.vinOt} (de la OT)` : l.vehiculo && !l.vehiculo.valido ? 'No lo da por OBD' : '—'))}${!cliente && v.vin && v.origen === 'uds' ? ' <small>(leído por UDS)</small>' : ''}</div>
 <div><small>Orden de trabajo</small>${esc(l.ot || '—')}</div>
 <div><small>Kilómetros</small>${esc(l.datos?.find((d) => d.pid === 0xa6)?.valor ?? l.km ?? '—')}</div>
 ${cliente ? '' : `<div><small>Realizado por</small>${esc(l.usuario || '—')}</div>`}

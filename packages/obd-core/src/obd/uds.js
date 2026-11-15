@@ -78,6 +78,27 @@ export async function escanearCentralitas(elm, { progreso = () => {} } = {}) {
   return pares;
 }
 
+/**
+ * Bastidor por UDS (22 F190), para coches cuyo motor no lo da por el modo 09 (p. ej. PSA de 2014-2018).
+ * Prueba la centralita de motor (y la caja de cambios); vuelve siempre a la petición general OBD.
+ * @returns {Promise<{vin:string, ecu:string}|null>}
+ */
+export async function leerVinUds(elm, { b29 = false } = {}) {
+  const pares = b29 ? [{ tx: '18DA10F1', rx: '18DAF110' }, { tx: '18DA18F1', rx: '18DAF118' }] : [{ tx: '7E0', rx: '7E8' }, { tx: '7E1', rx: '7E9' }];
+  try {
+    for (const c of pares) {
+      try {
+        await fijar(elm, c);
+        const v = ascii((await pedir(elm, '22F190', 0x22, 4000)).slice(2));
+        if (/^[A-HJ-NPR-Z0-9]{17}$/.test(v)) return { vin: v, ecu: c.rx };
+      } catch { /* esa centralita no lo da */ }
+    }
+    return null;
+  } finally {
+    await restaurar(elm, b29 ? 29 : 11).catch(() => {});
+  }
+}
+
 /** Nombre, referencia, bastidor y averías de una centralita. */
 export async function leerCentralita(elm, c, { volver = true } = {}) {
   const r = { tx: c.tx, rx: c.rx, nombre: null, referencia: null, vin: null, averias: [], error: null };

@@ -23,7 +23,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.11';
+const VERSION = '0.4.12';
 const api = crearApi({ demo: DEMO });
 // App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
 // adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
@@ -334,7 +334,7 @@ async function guardarSesionAuto({ final = false, sesion = null } = {}) {
   if (!a.id) { if (!estado.lectura && !final) return; a.id = idSesionAuto(a); }
   a.enCurso = true;
   const registro = estado.registroCompleto.slice(a.desdeRegistro);
-  const l = estado.lectura ? { ...estado.lectura, ot: estado.ot?.ot, matricula: estado.ot?.matricula ? formatoMatricula(estado.ot.matricula) : null, descripcionVehiculo: estado.ot?.vehiculo } : null;
+  const l = estado.lectura ? { ...estado.lectura, ot: estado.ot?.ot, matricula: estado.ot?.matricula ? formatoMatricula(estado.ot.matricula) : null, descripcionVehiculo: estado.ot?.vehiculo, vinOt: estado.ot?.vin || null } : null;
   const datos = {
     app: 'Reyman Diag', version: VERSION, modo: PRUEBAS ? 'pruebas' : DEMO ? 'demo' : 'normal', sesion: a.id,
     inicio: a.inicio.toISOString(), guardado: new Date().toISOString(), terminada: final, error: a.error,
@@ -1523,7 +1523,7 @@ async function analizarIa() {
 }
 
 function abrirInforme(version) {
-  const l = { ...estado.lectura, ot: estado.ot?.ot, matricula: estado.ot?.matricula ? formatoMatricula(estado.ot.matricula) : null, descripcionVehiculo: estado.ot?.vehiculo };
+  const l = { ...estado.lectura, ot: estado.ot?.ot, matricula: estado.ot?.matricula ? formatoMatricula(estado.ot.matricula) : null, descripcionVehiculo: estado.ot?.vehiculo, vinOt: estado.ot?.vin || null };
   const html = htmlInforme(l, { version, taller: estado.yo?.taller, logo: window.REYMAN_LOGO || 'logo.png' });
   const w = DEMO ? null : window.open('', '_blank');
   if (!w) {

@@ -141,8 +141,13 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Código: `apps/cliente/src/cliente.js` (+ `@capacitor/app`, `@capacitor/clipboard`, `@capacitor/browser`). Pruebas: `test/connect-cliente.test.js`.
 - Pendiente: que el WhatsApp con el enlace de Mi taller lleve también el enlace de la app; QR en recepción; fases 2 (libro de mantenimiento) y 3 (citas y avisos).
 
+### 20. Bastidor por UDS cuando el modo 09 no lo da → v0.4.12 / Connect 0.3.1 (15/11/2026)
+- Peugeot 308 THP 156 (8060HXZ, motor PSA, WiCAN Pro por Wi-Fi): `0902` y `090A` → NO DATA; solo contesta el motor (7E8, CALID 9805263499). El bastidor de la sesión de las 16:27 venía de la OT, no del coche.
+- `obd.vin()`: si el modo 09 falla, prueba `22 F190` en 7E0 y 7E1 (o 18DA10F1/18DA18F1 en 29 bits) con `leerVinUds` (`uds.js`) y vuelve a la petición general. Devuelve `origen: 'obd' | 'uds'`. Simulador: opción `sinVinObd`.
+- Informes: si el coche no da el bastidor y hay OT, sale el de la OT con «(de la OT)»; en el del taller, «(leído por UDS)» cuando viene por esa vía.
+
 ### Pruebas
-- **107 pruebas automáticas.**
+- **108 pruebas automáticas.**
 
 ## Pendiente
 

@@ -35,7 +35,7 @@ export function pdfInforme(fila, { version = 'cliente', taller = 'Talleres Reyma
     const v = l.vehiculo || {};
     const datos = [
       ['Matrícula', fila.matricula || '—'], ['Vehículo', [v.marca, v.año].filter(Boolean).join(' · ') || '—'],
-      ['Bastidor', v.vin || fila.vin || (v.valido === false ? 'No lo da por OBD' : '—')], ['Orden de trabajo', fila.ot || '—'],
+      ['Bastidor', v.vin || (fila.vin ? `${fila.vin} (de la OT)` : v.valido === false ? 'No lo da por OBD' : '—')], ['Orden de trabajo', fila.ot || '—'],
       ['Kilómetros', String(l.datos?.find((d) => d.pid === 0xa6)?.valor ?? '—')],
     ];
     const x0 = 46; let y = doc.y; const col = ancho / 3;

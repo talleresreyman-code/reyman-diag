@@ -4,6 +4,7 @@ import { decodificarPid, decodificarSoportados, infoPid, longitudPid, grupoDeSen
 import { decodificarReadiness } from './readiness.js';
 import { extraerDtcs, describirDtc } from './dtc.js';
 import { vinDesdeBytes, decodificarVin } from './vin.js';
+import { leerVinUds } from './uds.js';
 import { extraerPruebas, decodificarMidsSoportados } from './modo06.js';
 import { decodificarCalid, decodificarCvn, decodificarIpt, decodificarInfotiposSoportados, textoDeBytes } from './modo09.js';
 
@@ -66,8 +67,24 @@ export class Obd {
     return this.soportados;
   }
 
-  /** VIN (modo 09 PID 02). */
+  /**
+   * VIN: modo 09 PID 02 y, si el coche no lo da así (NO DATA, p. ej. PSA), por UDS 22 F190 a la centralita de motor.
+   * Devuelve además `origen`: 'obd' o 'uds'.
+   */
   async vin() {
+    try {
+      return { ...(await this.vinObd()), origen: 'obd' };
+    } catch (e) {
+      if (this.protocolo === 'uds' || typeof this.elm.enviar !== 'function') throw e;
+      const p = String(this.elm.info?.protocolo?.codigo || '');
+      const r = await leerVinUds(this.elm, { b29: ['7', '9', 'B'].includes(p.toUpperCase()) }).catch(() => null);
+      if (!r) throw e;
+      return { ...decodificarVin(r.vin), origen: 'uds', ecu: r.ecu };
+    }
+  }
+
+  /** VIN por el modo 09 PID 02 (o 22 F802 en OBD sobre UDS). */
+  async vinObd() {
     const r = await this.pedirInfo(0x02, 8000);
     const datos = r.respuestas[0].legacy
       ? r.respuestas.flatMap((x) => x.datos.slice(2))

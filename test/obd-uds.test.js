@@ -53,3 +53,19 @@ test('Decodificadores del servicio 09', () => {
   assert.equal(r.monitores[0].ratio, 0.3);
   assert.equal(r.monitores[1].ratio, null);
 });
+
+test('Bastidor: si el motor no lo da por el modo 09 (PSA), se lee por UDS 22 F190', async () => {
+  const { crearSimulador } = await import('@reyman/obd-core/transport/simulador.js');
+  const { Elm327 } = await import('@reyman/obd-core/obd/elm327.js');
+  const { Obd } = await import('@reyman/obd-core/obd/obd.js');
+  const t = crearSimulador({ coche: 'diesel', sinVinObd: true }); await t.conectar();
+  const elm = new Elm327(t, { timeoutMs: 3000 }); await elm.iniciar();
+  const obd = new Obd(elm);
+  const v = await obd.vin();
+  assert.equal(v.vin, 'WVWZZZAUZHW512345');
+  assert.equal(v.origen, 'uds');
+  assert.ok((await obd.leerPid(0x0c)).valor >= 0); // vuelve a la petición general OBD
+  const l = await obd.lecturaCompleta();
+  assert.equal(l.vehiculo.origen, 'uds');
+  await elm.cerrar();
+});
