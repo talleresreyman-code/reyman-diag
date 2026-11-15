@@ -10,6 +10,16 @@
         "availableDevices": "Adaptadores disponibles",
         "noDeviceFound": "No se ha encontrado ningún adaptador"
       }
+    },
+    "SystemBars": {
+      "initialViewportFitValueHint": "cover"
     }
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#eef1f5"
+  },
+  "android": {
+    "backgroundColor": "#eef1f5"
   }
 }
