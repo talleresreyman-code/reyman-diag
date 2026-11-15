@@ -23,7 +23,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.12';
+const VERSION = '0.4.13';
 const api = crearApi({ demo: DEMO });
 // App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
 // adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
@@ -248,6 +248,25 @@ function esperarActualizacion(antes) {
       else if (r.estado === 'error') { clearInterval(t); toast('La actualización ha fallado. Avisa a Claude con el archivo ultima.log del servidor.'); pintarVersion(); }
     } catch { /* el servidor se está reiniciando */ }
   }, 10000);
+}
+
+// Versión nueva en el servidor: al volver a la app (o cada 5 min) se recarga sola si no hay un coche conectado.
+// Así la app instalada del iPhone/iPad coge los cambios como Connect, sin tener que cerrarla.
+let commitCargado = null;
+async function commitServidor() {
+  try { return (await (await fetch('/api/version', { credentials: 'include', cache: 'no-store' })).json()).instalada?.commit || null; } catch { return null; }
+}
+async function vigilarVersion() {
+  if (DEMO) return;
+  const c = await commitServidor();
+  if (!c) return;
+  if (!commitCargado) { commitCargado = c; return; }
+  if (c !== commitCargado && !estado.conectado && !estado.auto && !estado.autoUltima?.enCurso) { toast('Hay una versión nueva de Reyman Diag. Recargando…'); setTimeout(() => location.reload(), 1200); }
+}
+if (!DEMO) {
+  vigilarVersion();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') vigilarVersion(); });
+  setInterval(vigilarVersion, 5 * 60000);
 }
 
 // ---------------------------------------------------------------------------

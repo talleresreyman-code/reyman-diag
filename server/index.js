@@ -380,8 +380,14 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   // --- interfaz ---
   app.get('/config.js', async (req, rep) => rep.type('application/javascript').send(`window.REYMAN_APP_URL=${JSON.stringify(cfg.appReymanPublica)};`));
   // Núcleo OBD común (packages/obd-core) en /core/: la app lo importa por el import map de index.html
-  await app.register(fastifyStatic, { root: path.join(RAIZ, 'packages', 'obd-core', 'src'), prefix: '/core/', decorateReply: false });
-  await app.register(fastifyStatic, { root: path.join(RAIZ, 'apps', 'taller'), index: ['index.html'] });
+  // Sin caché larga: el móvil (sobre todo la app instalada) comprueba siempre si hay versión nueva (ETag, sin descargar si no cambia)
+  const sinCache = { cacheControl: false };
+  app.addHook('onSend', async (req, rep, payload) => {
+    if (!req.url.startsWith('/api/') && !rep.getHeader('cache-control')) rep.header('Cache-Control', 'no-cache');
+    return payload;
+  });
+  await app.register(fastifyStatic, { root: path.join(RAIZ, 'packages', 'obd-core', 'src'), prefix: '/core/', decorateReply: false, ...sinCache });
+  await app.register(fastifyStatic, { root: path.join(RAIZ, 'apps', 'taller'), index: ['index.html'], ...sinCache });
 
   app.addHook('onClose', async () => store.cerrar());
   return { app, store };

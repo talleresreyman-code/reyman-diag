@@ -147,8 +147,13 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - `obd.vin()`: si el modo 09 falla, prueba `22 F190` en 7E0 y 7E1 (o 18DA10F1/18DA18F1 en 29 bits) con `leerVinUds` (`uds.js`) y vuelve a la petición general. Devuelve `origen: 'obd' | 'uds'`. Simulador: opción `sinVinObd`.
 - Informes: si el coche no da el bastidor y hay OT, sale el de la OT con «(de la OT)»; en el del taller, «(leído por UDS)» cuando viene por esa vía.
 
+### 21. La app instalada coge sola las versiones nuevas → v0.4.13 (15/11/2026)
+- La app Reyman Diag del iPhone seguía con la versión anterior aunque el servidor ya estaba actualizado (el WebView guardaba en caché `app.js` y los módulos de `/core/`).
+- Servidor: la interfaz y el núcleo se sirven con `Cache-Control: no-cache` (el móvil comprueba con ETag; si no ha cambiado no descarga nada).
+- App: guarda el commit del servidor al abrirse y lo vuelve a mirar al volver a la app y cada 5 min; si ha cambiado y no hay coche conectado ni sesión guardándose, se recarga sola.
+
 ### Pruebas
-- **108 pruebas automáticas.**
+- **109 pruebas automáticas.**
 
 ## Pendiente
 

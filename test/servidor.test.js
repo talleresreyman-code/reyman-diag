@@ -140,3 +140,11 @@ test('Grabación automática de la sesión: se guarda, se actualiza y n8n la cop
   await app.inject({ method: 'POST', url: `/api/ingest/registros/${p2[0].id}/subido`, headers: { 'x-api-key': 'k' }, payload: { actualizado: p2[0].actualizado, destino: 'x' } });
   assert.equal((await app.inject({ url: '/api/ingest/registros', headers: { 'x-api-key': 'k' } })).json().registros.length, 0);
 });
+
+test('la interfaz se sirve sin caché larga (la app instalada coge siempre la versión nueva)', async () => {
+  for (const url of ['/', '/app.js', '/core/obd/obd.js']) {
+    const r = await app.inject({ url });
+    assert.equal(r.statusCode, 200, url);
+    assert.equal(r.headers['cache-control'], 'no-cache', url);
+  }
+});
