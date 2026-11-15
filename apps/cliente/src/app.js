@@ -642,6 +642,7 @@ async function enviarAlTaller(tipo, extra = {}) {
 // ---------------------------------------------------------------------------
 async function iniciar() {
   st.datos = await cargar();
+  window.__reymanArrancada = true; // para el aviso de «no ha podido arrancar» de index.html
   if (!st.datos.conexion) st.datos.conexion = { tipo: 'ble' };
   if (!DEMO && !esNativa() && !formasDeConectar().webBle) st.error = 'Este navegador no permite Bluetooth. Usa la app Reyman Connect o Chrome en Android.';
   pintar();
