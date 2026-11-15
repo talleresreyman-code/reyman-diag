@@ -12,6 +12,19 @@
 <body>
 <div id="app"><main><p style="padding:24px">Cargando Reyman Connect…</p></main></div>
 <noscript>Reyman Connect necesita JavaScript.</noscript>
+<script>
+// Si algo falla al arrancar, se enseña en pantalla (en la app no hay consola a mano)
+(function () {
+  function ver(t) {
+    var a = document.getElementById('app');
+    if (!a || window.__reymanArrancada) return;
+    a.innerHTML = '<main style="padding:24px;font-family:system-ui"><h2>Reyman Connect no ha podido arrancar</h2><p>Haz una captura y envíasela al taller:</p><pre style="white-space:pre-wrap;background:#fff;padding:12px;border-radius:8px;font-size:13px">' + String(t).replace(/[<&]/g, function (c) { return c === '<' ? '&lt;' : '&amp;'; }) + '</pre></main>';
+  }
+  window.addEventListener('error', function (e) { ver((e.message || 'Error') + (e.filename ? '\n' + e.filename + ':' + e.lineno : '') + (e.error && e.error.stack ? '\n' + e.error.stack : '')); });
+  window.addEventListener('unhandledrejection', function (e) { var r = e.reason || {}; ver('Promesa rechazada: ' + (r.message || r) + (r.stack ? '\n' + r.stack : '')); });
+  setTimeout(function () { ver('Tiempo de espera agotado (15 s) sin terminar de cargar.\nCapacitor: ' + (window.Capacitor ? window.Capacitor.getPlatform && window.Capacitor.getPlatform() : 'no') + '\n' + navigator.userAgent); }, 15000);
+})();
+</script>
 <script src="app.js"></script>
 </body>
 </html>

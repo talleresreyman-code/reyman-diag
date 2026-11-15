@@ -19,14 +19,20 @@ export const DATOS_INICIALES = {
 
 let memoria = null;
 
-async function preferencias() {
+// OJO: los plugins de Capacitor son objetos «proxy» que responden a cualquier método, también a «then».
+// Si una función async devuelve el plugin tal cual, el await se queda esperando para siempre (la app no arrancaba
+// en el iPad). Por eso se guarda en una variable y se devuelve envuelto.
+let plugin = undefined;
+async function cargarPlugin() {
+  if (plugin !== undefined) return;
+  plugin = null;
   try {
-    if (globalThis.Capacitor?.isNativePlatform?.()) {
-      const { Preferences } = await import('@capacitor/preferences');
-      return Preferences;
-    }
-  } catch { /* sin plugin */ }
-  return null;
+    if (globalThis.Capacitor?.isNativePlatform?.()) plugin = (await import('@capacitor/preferences')).Preferences;
+  } catch { plugin = null; }
+}
+async function preferencias() {
+  await cargarPlugin();
+  return plugin ? { get: (o) => plugin.get(o), set: (o) => plugin.set(o), remove: (o) => plugin.remove(o) } : null;
 }
 
 export async function cargar() {
