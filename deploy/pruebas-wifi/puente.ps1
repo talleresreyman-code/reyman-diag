@@ -235,6 +235,65 @@ function ServirApp($ctx) {
       $res.ContentType = 'application/json; charset=utf-8'
       $res.ContentLength64 = $b.Length
       $res.OutputStream.Write($b, 0, $b.Length)
+    } elseif ($ruta -eq '/wican') {
+      # API HTTP del WiCAN Pro (estado, firmware, tensión, averías del firmware 6…), solo en la red local
+      # y solo rutas /api/... o /check_status. Mientras hay un coche conectado el enlace está ocupado y no llega aquí.
+      $origen = $ctx.Request.Headers['Origin']
+      if ($origen -match '^https://([a-z0-9-]+\.)*talleresreyman\.es$' -or $origen -match '^http://(localhost|127\.0\.0\.1)(:\d+)?$') {
+        $res.Headers.Add('Access-Control-Allow-Origin', $origen)
+        $res.Headers.Add('Access-Control-Allow-Private-Network', 'true')
+        $res.Headers.Add('Access-Control-Allow-Methods', 'GET, POST')
+        $res.Headers.Add('Access-Control-Allow-Headers', 'content-type, x-metodo')
+        $res.Headers.Add('Vary', 'Origin')
+      } elseif ($origen) { $res.StatusCode = 403; return }
+      if ($ctx.Request.HttpMethod -eq 'OPTIONS') { $res.StatusCode = 204; return }
+      $wHost = [string]$ctx.Request.QueryString['host']
+      $wRuta = [string]$ctx.Request.QueryString['ruta']
+      $metodo = 'GET'
+      if ($ctx.Request.HttpMethod -eq 'POST') {
+        $metodo = 'POST'
+        $xm = [string]$ctx.Request.Headers['x-metodo']
+        if ($xm -in @('PUT', 'DELETE')) { $metodo = $xm }
+      }
+      if (-not (DireccionPermitida $wHost) -or $wRuta -notmatch '^/(api/[A-Za-z0-9_./:%-]*|check_status)(\?[A-Za-z0-9_=&%.,:-]*)?$') { $res.StatusCode = 400; return }
+      $cuerpo = $null
+      if ($metodo -ne 'GET') {
+        if ($ctx.Request.ContentLength64 -gt 256KB) { $res.StatusCode = 413; return }
+        $ms = New-Object IO.MemoryStream
+        $ctx.Request.InputStream.CopyTo($ms)
+        $cuerpo = $ms.ToArray()
+      }
+      $codigo = 200
+      $bytes = $null
+      try {
+        $req = [Net.HttpWebRequest]::Create('http://' + $wHost + $wRuta)
+        $req.Method = $metodo
+        $req.Timeout = 6000
+        $req.ReadWriteTimeout = 6000
+        $req.Proxy = $null
+        if ($cuerpo) {
+          $req.ContentType = 'application/json'
+          $req.ContentLength = $cuerpo.Length
+          $st = $req.GetRequestStream(); $st.Write($cuerpo, 0, $cuerpo.Length); $st.Close()
+        }
+        try { $resp = $req.GetResponse() } catch [Net.WebException] {
+          if ($_.Exception.Response) { $resp = $_.Exception.Response } else { throw }
+        }
+        $codigo = [int]$resp.StatusCode
+        $ms2 = New-Object IO.MemoryStream
+        $resp.GetResponseStream().CopyTo($ms2)
+        $resp.Close()
+        $bytes = $ms2.ToArray()
+      } catch {
+        $codigo = 504
+        $bytes = [Text.Encoding]::UTF8.GetBytes('El WiCAN no contesta en ' + $wHost + '. Conecta el portátil a su red Wi-Fi (WiCAN_...).')
+        Log ('WiCAN ' + $wHost + $wRuta + ': sin respuesta (' + $_.Exception.Message + ')')
+      }
+      $res.StatusCode = $codigo
+      $res.ContentType = 'application/json; charset=utf-8'
+      $res.Headers.Add('Cache-Control', 'no-store')
+      $res.ContentLength64 = $bytes.Length
+      $res.OutputStream.Write($bytes, 0, $bytes.Length)
     } elseif ($ruta -eq '/' -or $ruta -eq '/index.html') {
       $b = [IO.File]::ReadAllBytes($appFile)
       $res.ContentType = 'text/html; charset=utf-8'

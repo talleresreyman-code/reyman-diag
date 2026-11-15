@@ -36,8 +36,13 @@ export function crearTransporteBleNativo(op = {}) {
     // Preferimos escritura y notificación del MISMO servicio, y los servicios conocidos primero
     const orden = [...servicios].sort((a, b) => (SERVICIOS_BLE.includes(b.uuid) ? 1 : 0) - (SERVICIOS_BLE.includes(a.uuid) ? 1 : 0));
     for (const s of orden) {
-      const esc = s.characteristics.find((c) => c.properties.write || c.properties.writeWithoutResponse);
-      const not = s.characteristics.find((c) => c.properties.notify || c.properties.indicate);
+      // En el servicio FFF0 el canal ELM327 es FFF1 (notificación) + FFF2 (escritura). El WiCAN Pro con
+      // firmware 6 tiene ahí más canales (FFF3/FFF4 API HTTP, FFF5/FFF6 J2534): no hay que coger esos.
+      const pref = (c, sufijo) => c.uuid.toLowerCase().startsWith(`0000${sufijo}-`);
+      const esc = s.characteristics.find((c) => pref(c, 'fff2') && (c.properties.write || c.properties.writeWithoutResponse))
+        || s.characteristics.find((c) => c.properties.write || c.properties.writeWithoutResponse);
+      const not = s.characteristics.find((c) => pref(c, 'fff1') && (c.properties.notify || c.properties.indicate))
+        || s.characteristics.find((c) => c.properties.notify || c.properties.indicate);
       if (esc && not) return { servicio: s.uuid, escritura: esc.uuid, notificacion: not.uuid, sinRespuesta: !esc.properties.write && !!esc.properties.writeWithoutResponse };
     }
     return null;

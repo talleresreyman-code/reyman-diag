@@ -9,6 +9,7 @@ import { crearTransporteWifi, WIFI_POR_DEFECTO } from '@reyman/obd-core/transpor
 import { crearTransporteJ2534 } from '@reyman/obd-core/transport/j2534.js';
 import { crearTransporteBleNativo } from '@reyman/obd-core/transport/ble-nativo.js';
 import { crearTransporteWifiNativo } from '@reyman/obd-core/transport/wifi-nativo.js';
+import { crearClienteWican, pedirPorEnlace, pedirNativo, revisarAjustes, textoWican } from '@reyman/obd-core/wican.js';
 import { escanearCentralitas, leerTodasLasCentralitas, leerCentralita, borrarCentralita } from '@reyman/obd-core/obd/uds.js';
 import { decodificarVin } from '@reyman/obd-core/obd/vin.js';
 import { esFord, leerBateriaHibridaFord } from '@reyman/obd-core/marcas/ford.js';
@@ -23,7 +24,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.13';
+const VERSION = '0.4.14';
 const api = crearApi({ demo: DEMO });
 // App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
 // adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
@@ -150,7 +151,7 @@ function vConectar() {
     <div id="con-progreso" class="panel" hidden></div>
     <div class="opciones-conexion">
       <button class="opcion" data-con="ble" ${bt ? '' : 'disabled'}>${I.bt}<strong>Bluetooth</strong><span>${NATIVA ? 'vLinker o WiCAN por Bluetooth. Elige el adaptador en la lista.' : bt ? 'Móvil, tablet o portátil. Elige «vLinker» en la lista.' : !window.isSecureContext ? 'Necesita abrir la app por https://.' : 'Este navegador no permite Bluetooth. Usa Chrome.'}</span></button>
-      ${NATIVA ? '' : `<button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234) o cable USB.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>`}
+      ${NATIVA ? '' : `<button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234), cable USB o WiCAN Pro por su cable USB-C. La velocidad se busca sola.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>`}
       <button class="opcion" data-con="wifi" ${wifi ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${NATIVA ? `WiCAN Pro u otro adaptador Wi-Fi, directo desde este dispositivo. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       ${NATIVA ? '' : `<button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel V200 (J2534)</strong><span>${conPuente() ? 'MaxiVCI V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Otra interfaz Autel (VCMI…)</strong><span>${conPuente() ? `VCMI u otra interfaz J2534 instalada en el portátil.${otraJ2534() ? ` Última: ${esc(otraJ2534())}.` : ''}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>`}
@@ -176,7 +177,7 @@ function vConectar() {
   }));
   if (estado.conectado) {
     $('#con-progreso').hidden = false;
-    $('#con-progreso').innerHTML = `<p><strong>Conectado</strong> por ${esc(estado.transporte.nombre)}.</p><div class="fila-btn"><button class="btn sec" id="desconectar">Desconectar</button><button class="btn" id="releer">Leer de nuevo</button><button class="btn sec" id="bat-prueba">Batería y alternador</button></div>`;
+    $('#con-progreso').innerHTML = `<p><strong>Conectado</strong> por ${esc(estado.transporte.nombre)}.</p>${estado.wican?.info ? htmlWican(estado.wican, { corto: true }) : ''}<div class="fila-btn"><button class="btn sec" id="desconectar">Desconectar</button><button class="btn" id="releer">Leer de nuevo</button><button class="btn sec" id="bat-prueba">Batería y alternador</button></div>`;
     $('#bat-prueba').onclick = dialogoBateria;
     $('#desconectar').onclick = desconectar;
     $('#releer').onclick = leerTodo;
@@ -553,18 +554,95 @@ async function buscarPuente() {
 function cfgWifi() {
   try { return { ...WIFI_POR_DEFECTO, ...JSON.parse(localStorage.getItem('reyman-diag-wifi') || '{}') }; } catch { return { ...WIFI_POR_DEFECTO }; }
 }
+// ---------------------------------------------------------------------------
+// WiCAN Pro: su API HTTP (qué aparato es, firmware, tensión, SD, ajustes y, con el firmware 6, averías).
+// En el navegador del portátil va por el programa de enlace, antes de conectar el coche (el enlace atiende
+// una cosa a la vez); en la app instalada, con HTTP nativo y en cualquier momento.
+// ---------------------------------------------------------------------------
+const NO_WICAN = new Set(); // direcciones que ya sabemos que no son un WiCAN (ELM327 Wi-Fi corrientes)
+function clienteWican() {
+  const host = cfgWifi().host;
+  if (NATIVA) {
+    const Http = window.Capacitor?.Plugins?.CapacitorHttp;
+    return Http ? crearClienteWican({ pedir: pedirNativo({ host, Http }) }) : null;
+  }
+  if (!conPuente()) return null;
+  return crearClienteWican({ pedir: pedirPorEnlace({ host }) });
+}
+async function comprobarWican({ timeoutMs = 3000, forzar = false } = {}) {
+  const host = cfgWifi().host;
+  const c = clienteWican();
+  if (!c) return { info: null, error: 'Abre «Iniciar Reyman Diag» en el portátil.' };
+  if (!forzar && NO_WICAN.has(host)) return { info: null, error: 'Este adaptador no es un WiCAN.' };
+  try {
+    const trabajo = (async () => {
+      const info = await c.identificar();
+      const est = await c.estado().catch(() => null);
+      return { info, est, avisos: revisarAjustes(info, est, { conexion: 'wifi', puerto: cfgWifi().puerto }) };
+    })();
+    const w = await Promise.race([trabajo, new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('El adaptador no contesta como WiCAN.'), { code: 'TIMEOUT' })), timeoutMs))]);
+    NO_WICAN.delete(host);
+    estado.wican = { ...w, cliente: c, host };
+    return estado.wican;
+  } catch (e) {
+    if (e.code === 'NO_WICAN' || e.code === 'TIMEOUT') NO_WICAN.add(host);
+    return { info: null, error: e.message };
+  }
+}
+function htmlWican(w, { corto = false } = {}) {
+  const { info, est, avisos = [] } = w;
+  const tension = est?.tension != null ? `${formatear(est.tension)} V` : '';
+  const sd = est?.sd ? (est.sd.estado === 'mounted' ? `SD${est.sd.capacidadGB ? ` ${formatear(est.sd.capacidadGB)} GB` : ''} lista` : 'SD con problemas') : '';
+  const linea = [textoWican(info), tension && `mide ${tension}`, sd, est?.ble?.activo ? 'Bluetooth activado' : ''].filter(Boolean).join(' · ');
+  const av = avisos.filter((a) => !corto || a.nivel !== 'info');
+  return `<div class="panel peq" style="margin:8px 0"><strong>${esc(linea)}</strong>${av.length ? `<ul style="margin:6px 0 0 18px">${av.map((a) => `<li${a.nivel === 'error' ? ' style="color:var(--rojo,#b91c1c)"' : ''}>${esc(a.texto)}</li>`).join('')}</ul>` : ''}</div>`;
+}
+async function averiasDesdeWican(caja) {
+  const c = estado.wican?.cliente;
+  if (!c || !caja) return;
+  if (!NATIVA && estado.conectado && estado.transporte?.tipo === 'wifi') {
+    caja.innerHTML = '<div class="aviso">Desconecta el coche primero: en el portátil el programa de enlace atiende una cosa a la vez.</div>';
+    return;
+  }
+  caja.innerHTML = '<div class="progreso"><span class="giro"></span>El WiCAN está leyendo las averías…</div>';
+  try {
+    const r = await c.leerAverias();
+    estado.lecturasSesion.push({ tipo: 'wican-averias', fecha: new Date().toISOString(), averias: r });
+    const fila = (t, arr) => (arr.length ? `<p><strong>${t}:</strong> ${arr.map((x) => esc(x.codigo + (x.descripcionWican ? ` (${x.descripcionWican})` : ''))).join(', ')}</p>` : '');
+    const total = r.almacenadas.length + r.pendientes.length + r.permanentes.length;
+    caja.innerHTML = `<div class="panel peq">${r.mil ? '<p><strong>Testigo de motor encendido.</strong></p>' : ''}${total ? fila('Confirmadas', r.almacenadas) + fila('Pendientes', r.pendientes) + fila('Permanentes', r.permanentes) : '<p>Sin averías.</p>'}<p class="suave">Han contestado ${r.centralitas.length} centralita(s). Para borrar, conecta el coche y usa «Averías» (queda registrado).</p></div>`;
+  } catch (e) {
+    caja.innerHTML = `<div class="aviso">${esc(e.message)}</div>`;
+  }
+}
 function dialogoWifi() {
   const c = cfgWifi();
   const d = dialogo(`<h3>Adaptador Wi-Fi</h3><p class="suave">${NATIVA ? 'El adaptador y este dispositivo tienen que estar en la misma red Wi-Fi: la del propio adaptador (WiCAN…) o la del taller si el adaptador está conectado a ella.' : 'Conecta el portátil a la red Wi-Fi del adaptador (WiFi_OBDII, WiCAN… ) y deja abierta la ventana del programa de enlace.'}</p>
     <div class="campo"><label for="w-ip">Dirección del adaptador</label><input id="w-ip" value="${esc(c.host)}" inputmode="decimal"></div>
     <div class="campo"><label for="w-puerto">Puerto</label><input id="w-puerto" value="${esc(c.puerto)}" inputmode="numeric"></div>
     <p class="peq suave">Normalmente 192.168.0.10 y 35000. Algunos usan 192.168.4.1.</p>
-    <div class="fila-btn"><button class="btn fantasma" value="cancel" formmethod="dialog">Cancelar</button><button class="btn" id="w-ok">Conectar</button></div>`);
-  $('#w-ok', d).onclick = (e) => {
-    e.preventDefault();
+    <div id="w-wican"></div>
+    <div class="fila-btn"><button class="btn fantasma" value="cancel" formmethod="dialog">Cancelar</button><button class="btn sec" id="w-comprobar">Comprobar WiCAN</button><button class="btn" id="w-ok">Conectar</button></div>`);
+  const guardarCfg = () => {
     const host = $('#w-ip', d).value.trim();
     const puerto = Number($('#w-puerto', d).value) || 35000;
     try { localStorage.setItem('reyman-diag-wifi', JSON.stringify({ host, puerto })); } catch { /* */ }
+  };
+  $('#w-comprobar', d).onclick = async (e) => {
+    e.preventDefault();
+    guardarCfg();
+    const caja = $('#w-wican', d);
+    caja.innerHTML = '<div class="progreso"><span class="giro"></span>Preguntando al WiCAN…</div>';
+    const w = await comprobarWican({ timeoutMs: 8000, forzar: true });
+    caja.innerHTML = w.info
+      ? htmlWican(w) + (w.info.generacion === 6 ? '<div class="fila-btn"><button class="btn sec" id="w-averias">Leer averías con el WiCAN</button></div><div id="w-averias-res"></div>' : '')
+      : `<div class="aviso">${esc(w.error || 'No contesta ningún WiCAN.')}</div>`;
+    const b = $('#w-averias', d);
+    if (b) b.onclick = (ev) => { ev.preventDefault(); averiasDesdeWican($('#w-averias-res', d)); };
+  };
+  $('#w-ok', d).onclick = (e) => {
+    e.preventDefault();
+    guardarCfg();
     d.close();
     conectar('wifi');
   };
@@ -577,11 +655,23 @@ async function conectar(tipo, coche) {
   try {
     if (estado.conectado) await desconectar(true);
     nuevaSesionAuto(tipo);
+    estado.wican = null;
+    if (tipo === 'wifi') {
+      // Si es un WiCAN, antes de abrir el canal ELM327 se mira qué es y si está bien configurado
+      paso('Comprobando el adaptador…');
+      const w = await comprobarWican({ timeoutMs: 3000 });
+      if (w.info) {
+        estado.lecturasSesion.push({ tipo: 'wican', fecha: new Date().toISOString(), info: w.info, estado: w.est, avisos: w.avisos });
+        const grave = w.avisos.find((a) => a.nivel === 'error');
+        if (grave) throw new Error(grave.texto);
+      }
+    }
     paso('Buscando el adaptador…');
     if (NATIVA && tipo === 'ble') estado.transporte = crearTransporteBleNativo({ BleClient: (await nativo()).BleClient });
     else if (NATIVA && tipo === 'wifi') estado.transporte = crearTransporteWifiNativo({ TcpSocket: (await nativo()).TcpSocket, ...cfgWifi() });
     else estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ puente: `ws://localhost:35001/j2534${coche ? `?dll=${encodeURIComponent(coche)}` : ''}`, log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
     await estado.transporte.conectar();
+    if (estado.wican?.info) estado.transporte.nombre = `${textoWican(estado.wican.info)} · Wi-Fi`;
     estado.transporte.alDesconectarse(() => { estado.conectado = false; estadoBarra('Adaptador desconectado'); toast('Se ha perdido la conexión con el adaptador.'); });
     estado.elm = new Elm327(estado.transporte, { log, timeoutMs: tipo === 'j2534' ? 20000 : undefined });
     estado.uds = null; estado.modo06 = null; estado.modo09 = null; estado.bateriaHv = null;
@@ -627,6 +717,7 @@ async function leerTodo() {
   const paso = (t) => { if (prog) { prog.hidden = false; prog.innerHTML = `<div class="progreso"><span class="giro"></span>${esc(t)}</div>`; } estadoBarra(t, 'busy'); };
   const l = await estado.obd.lecturaCompleta(paso);
   l.usuario = estado.yo?.usuario?.nombre;
+  if (estado.wican?.info) l.wican = { texto: textoWican(estado.wican.info), modelo: estado.wican.info.modelo, firmware: estado.wican.info.firmware, generacion: estado.wican.info.generacion, tension: estado.wican.est?.tension ?? null };
   // El escaneo de todas las centralitas sigue valiendo tras releer; y si dio el bastidor, se reutiliza
   if (estado.modo06) l.modo06 = estado.modo06;
   if (estado.modo09) l.modo09 = estado.modo09;

@@ -1,4 +1,4 @@
-﻿REYMAN DIAG v0.4.13 - PRUEBAS EN EL PORTÁTIL (Windows): MAXIVCI V200 Y ADAPTADOR WI-FI
+﻿REYMAN DIAG v0.4.14 - PRUEBAS EN EL PORTÁTIL (Windows): MAXIVCI V200 Y ADAPTADOR WI-FI
 =====================================================================================
 
 Qué es
@@ -21,7 +21,7 @@ PRUEBA CON LA MAXIVCI V200
 2. Contacto puesto, MOTOR PARADO (para el escaneo de centralitas).
 3. Doble clic en "Iniciar Reyman Diag".
    Se abre una ventana negra (no la cierres) y la app en Chrome o Edge.
-   Arriba debe poner "Modo pruebas v0.4.13".
+   Arriba debe poner "Modo pruebas v0.4.14".
    La ventana negra debe decir "J2534: preparado".
    Si Windows avisa "Windows protegió su PC": "Más información" > "Ejecutar de todas formas".
 4. En la app, pulsa "Autel V200 (J2534)" (o "Otra interfaz Autel (VCMI…)" y elige la tuya) y espera la lectura (sale sola).
@@ -39,6 +39,20 @@ PRUEBA CON EL ADAPTADOR WI-FI (como antes)
 1. Adaptador en la toma OBD y contacto puesto.
 2. Wi-Fi del portátil a la red del adaptador (WiFi_OBDII o parecido; clave 12345678 o ninguna).
 3. "Iniciar Reyman Diag", pulsa "Wi-Fi" y "Conectar" (192.168.0.10, puerto 35000).
+
+PRUEBA CON EL WICAN PRO (novedad v0.4.14)
+Por Wi-Fi:
+1. WiCAN Pro en la toma OBD y contacto puesto.
+2. Wi-Fi del portátil a la red del WiCAN (WiCAN_..., clave @meatpi#).
+3. "Iniciar Reyman Diag" > "Wi-Fi" > "Comprobar WiCAN".
+   Tiene que salir "WiCAN Pro · firmware X · mide 12,x V" y, si algo está mal configurado, qué cambiar.
+4. "Conectar". Arriba saldrá "WiCAN Pro · firmware X · Wi-Fi" y la lectura sale sola.
+5. Averías, Pre-ITV, En vivo y "Batería y alternador" como con cualquier adaptador.
+Por cable USB-C:
+1. Cable USB-C del WiCAN al portátil (el WiCAN sigue en la toma OBD).
+2. En la app, "Puerto COM o USB". Windows enseña DOS puertos del WiCAN: elige uno.
+   La app busca sola la velocidad. Si dice "prueba con el otro", repite con el otro puerto.
+3. Apunta qué puerto ha funcionado (COM3, COM4...).
 
 Al terminar
 - Botón "Descargar registro" (en Vehículo, o en "Conectar" > "Registro de comunicación").

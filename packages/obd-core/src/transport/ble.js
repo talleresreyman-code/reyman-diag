@@ -31,7 +31,7 @@ export function crearTransporteBle() {
     async conectar() {
       if (!bleDisponible()) throw new Error('Este navegador no permite Bluetooth. Usa Chrome en Android o Chrome/Edge en el portátil.');
       dispositivo = await navigator.bluetooth.requestDevice({
-        filters: [{ namePrefix: 'vLinker' }, { namePrefix: 'OBD' }, { namePrefix: 'V-LINK' }, { namePrefix: 'IOS-Vlink' }, { namePrefix: 'Android-Vlink' }],
+        filters: [{ namePrefix: 'vLinker' }, { namePrefix: 'OBD' }, { namePrefix: 'V-LINK' }, { namePrefix: 'IOS-Vlink' }, { namePrefix: 'Android-Vlink' }, { namePrefix: 'WiCAN' }],
         optionalServices: SERVICIOS,
       }).catch(async (e) => {
         if (e.name === 'NotFoundError' && /cancel/i.test(e.message)) throw e;
@@ -42,13 +42,16 @@ export function crearTransporteBle() {
       dispositivo.addEventListener('gattserverdisconnected', () => alDesconectar());
       const servidor = await dispositivo.gatt.connect();
       const servicios = await servidor.getPrimaryServices();
+      // Escritura y notificación del MISMO servicio. En FFF0 el canal ELM327 es FFF1 + FFF2 (el WiCAN Pro
+      // con firmware 6 tiene ahí también FFF3/FFF4 y FFF5/FFF6, que no son el ELM327).
+      const pref = (c, sufijo) => String(c.uuid).toLowerCase().startsWith(`0000${sufijo}-`);
       for (const s of servicios) {
         const chars = await s.getCharacteristics();
-        for (const c of chars) {
-          if (!escritura && (c.properties.write || c.properties.writeWithoutResponse)) escritura = c;
-          if (!notificacion && (c.properties.notify || c.properties.indicate)) notificacion = c;
-        }
-        if (escritura && notificacion) break;
+        const esc = chars.find((c) => pref(c, 'fff2') && (c.properties.write || c.properties.writeWithoutResponse))
+          || chars.find((c) => c.properties.write || c.properties.writeWithoutResponse);
+        const not = chars.find((c) => pref(c, 'fff1') && (c.properties.notify || c.properties.indicate))
+          || chars.find((c) => c.properties.notify || c.properties.indicate);
+        if (esc && not) { escritura = esc; notificacion = not; break; }
       }
       if (!escritura || !notificacion) throw new Error('El adaptador no expone un canal de datos compatible (ELM327).');
       notificacion.addEventListener('characteristicvaluechanged', (ev) => cb(dec.decode(ev.target.value)));

@@ -99,7 +99,7 @@ ${seccion06}${seccion09}
 ${rd.semaforo ? `<p><span class="sem ${rd.semaforo}">${esc(SEMAFORO[rd.semaforo])}</span></p><p>${esc(rd.motivo || '')}</p>${cliente ? '' : `<ul>${monitores}</ul>`}` : '<p>No disponible.</p>'}
 ${ff}${datos}${foto}${ia}
 ${l.borrado ? `<h2>Borrado de averías</h2><p>Averías borradas el ${fmtFecha(l.borrado.fecha)}${cliente ? '' : ` por ${esc(l.borrado.usuario || '')}`}.</p>` : ''}
-<footer>${esc(taller.nombre || 'Talleres Reyman, S.L.')} · Arganda del Rey (Madrid) · talleresreyman.com${cliente ? '' : ` · Adaptador: ${esc(l.adaptador?.version || '')} · Protocolo: ${esc(l.adaptador?.protocolo?.nombre || '')}`}</footer>
+<footer>${esc(taller.nombre || 'Talleres Reyman, S.L.')} · Arganda del Rey (Madrid) · talleresreyman.com${cliente ? '' : ` · Adaptador: ${esc(l.wican?.texto || l.adaptador?.version || '')} · Protocolo: ${esc(l.adaptador?.protocolo?.nombre || '')}`}</footer>
 </body></html>`;
 }
 

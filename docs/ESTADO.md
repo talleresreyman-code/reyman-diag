@@ -1,4 +1,4 @@
-# Reyman Diag · Reyman Connect · estado (08/11/2026, v0.4.4)
+# Reyman Diag · Reyman Connect · estado (15/11/2026, v0.4.14)
 
 Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba disponible: la conexión Wi-Fi se ha rehecho a partir del programa de enlace).
 
@@ -152,8 +152,19 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Servidor: la interfaz y el núcleo se sirven con `Cache-Control: no-cache` (el móvil comprueba con ETag; si no ha cambiado no descarga nada).
 - App: guarda el commit del servidor al abrirse y lo vuelve a mirar al volver a la app y cada 5 min; si ha cambiado y no hay coche conectado ni sesión guardándose, se recarga sola.
 
+### 22. WiCAN Pro integrado en Reyman Diag (paso 1 del plan WiCAN) → v0.4.14 (15/11/2026)
+- Plan del WiCAN Pro acordado con José (todo se desarrolla, por fases): 1) WiCAN en Reyman Diag (Wi-Fi y USB); 2) grabador de fallos intermitentes y batería/alternador; 3) Reyman Connect por Bluetooth con configuración automática; 4) envío de datos a n8n y avisos; 5) J2534, UDS y PID de marca; 6) 4G (ESPNetLink) y firmware propio.
+- **API HTTP del WiCAN** (`packages/obd-core/src/wican.js`): reconoce el firmware 4.x (`/check_status`, sin guardar contraseñas) y el 6.x (`/api/info`, `/api/status`, `/api/battery`, `/api/ble`, `/api/wifi/status`). Estado común: tensión, protocolo, puerto, Wi-Fi, Bluetooth, reposo, SD, vehículo. `revisarAjustes()` dice qué cambiar (protocolo que no es ELM327 → no deja conectar y explica cómo arreglarlo; puerto distinto; Bluetooth encendido por Wi-Fi; firmware < 4.50; SD ilegible; batería baja).
+- Firmware 6 (beta de MeatPi, `dev-v6`): lectura de averías del propio WiCAN (`/api/autopid/dtc/scan` + espera), borrado (`/dtc/clear`, solo si el WiCAN lo permite; la app no lo usa todavía: el borrado sigue por ELM327 con registro) y peticiones UDS (`/api/uds/request`).
+- **Cómo llega la app a la API:** en el portátil, por el programa de enlace (nueva ruta `/wican` de `puente.ps1`: solo IP de red local y rutas `/api/...` o `/check_status`; el enlace atiende una cosa a la vez, así que se usa antes de conectar el coche). En la app instalada, HTTP nativo (CapacitorHttp) en cualquier momento; `preparar-nativo.mjs` añade `NSAllowsLocalNetworking` (iOS) y `usesCleartextTraffic` (Android).
+- **Reyman Diag:** «Wi-Fi» → botón **«Comprobar WiCAN»** (modelo, firmware, tensión que mide, SD, Bluetooth y avisos; con firmware 6, «Leer averías con el WiCAN»). Al conectar por Wi-Fi se comprueba solo (3 s; un ELM327 Wi-Fi corriente se recuerda como «no es WiCAN»); la barra pone «WiCAN Pro · firmware X · Wi-Fi», va en el registro de la sesión y en el pie del informe del taller.
+- **USB:** el transporte serie busca solo la velocidad (38.400, 115.200, 2.000.000, 500.000, 9.600) mandando `ATI`; si ninguna contesta, avisa de probar el otro puerto COM del WiCAN Pro (Windows le da dos).
+- **Bluetooth:** en el servicio FFF0 se coge siempre FFF1 (notificación) + FFF2 (escritura): el firmware 6 del WiCAN pone ahí también la API (FFF3/FFF4) y J2534 (FFF5/FFF6). En la web, el filtro también busca «WiCAN».
+- Probado en Chrome con un enlace y un WiCAN 4.50 falsos: «Comprobar WiCAN», conexión con nombre en la barra y bloqueo con explicación si el WiCAN está en «realdash66».
+- Pendiente de probar con el WiCAN real: Wi-Fi, «Comprobar WiCAN», USB-C (qué puerto COM y qué velocidad) y Bluetooth en la app instalada (recompilar la app para los permisos de red local).
+
 ### Pruebas
-- **109 pruebas automáticas.**
+- **121 pruebas automáticas.**
 
 ## Pendiente
 
