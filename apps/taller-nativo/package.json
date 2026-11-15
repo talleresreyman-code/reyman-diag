@@ -1,0 +1,21 @@
+{
+  "name": "reyman-diag-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Reyman Diag · app de taller instalable (iPad, iPhone y Android). Abre diag.talleresreyman.es dentro de la app y le da Bluetooth y Wi-Fi directos con el adaptador (WiCAN, vLinker).",
+  "scripts": {
+    "nativo": "node ../../scripts/build-nativo.js"
+  },
+  "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.3.0",
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0",
+    "capacitor-tcp-socket": "^8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
+    "esbuild": "^0.25.12"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "appId": "es.talleresreyman.diag",
+  "appName": "Reyman Diag",
+  "webDir": "www",
+  "server": {
+    "url": "https://diag.talleresreyman.es",
+    "allowNavigation": ["talleresreyman.es", "*.talleresreyman.es"],
+    "errorPath": "sin-conexion.html"
+  },
+  "ios": { "contentInset": "never", "backgroundColor": "#143f7a" },
+  "android": { "backgroundColor": "#143f7a" },
+  "plugins": {
+    "SystemBars": { "initialViewportFitValueHint": "cover" },
+    "BluetoothLe": {
+      "displayStrings": {
+        "scanning": "Buscando el adaptador…",
+        "cancel": "Cancelar",
+        "availableDevices": "Adaptadores disponibles",
+        "noDeviceFound": "No se ha encontrado ningún adaptador"
+      }
+    }
+  }
+}

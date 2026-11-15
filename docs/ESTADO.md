@@ -124,6 +124,13 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - App: «Inicio → Adaptador · Cambiar» para elegir Bluetooth o Wi-Fi (dirección y puerto).
 - APK de pruebas compilado en GitHub Actions (`.github/workflows/connect-android.yml`, `scripts/preparar-nativo.mjs` pone los permisos); el APK se guarda también en la rama `apk` (los artefactos de Actions no se pueden descargar desde aquí) y se copia a Drive `REYMAN DIAG\Reyman_Connect_vX.Y.Z`.
 - iPhone/iPad: `.github/workflows/connect-ios.yml` compila en un Mac de GitHub (Xcode 26.6, proyecto SPM). Sin secretos: compila sin firmar (comprobado el 14/11/2026, BUILD SUCCEEDED). Con los secretos `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` y `APPLE_TEAM_ID`: firma automática y subida a TestFlight. Cuenta de desarrollador de José (particular) aprobada el 15/11/2026; app creada en App Store Connect (`es.talleresreyman.connect`) y secretos puestos en GitHub. La firma va así: archivo sin firmar y firma de distribución en la nube al exportar (con firma automática de desarrollo fallaba por no tener dispositivos). Primera subida a TestFlight: v0.2.0 (compilación 4), 15/11/2026.
+- 0.2.1 / 0.2.2: arreglado el «Cargando» en iPad (plugin devuelto desde una función async) y el aviso de arranque. 0.2.3: pantalla completa en el móvil (sin ancho máximo, de borde a borde respetando muesca y barras).
+
+### 18. Dos apps: Reyman Diag instalable (taller) y Reyman Connect (cliente) → v0.4.11 (15/11/2026)
+- Decidido con José: **Reyman Connect** = app sencilla para clientes; **Reyman Diag** = app profesional del taller con todas las funciones. Cada ampliación o arreglo se le explica antes.
+- Nueva `apps/taller-nativo/` (Capacitor, `es.talleresreyman.diag`): abre https://diag.talleresreyman.es dentro de la app (mismo login de la App Reyman; se actualiza con el servidor, sin recompilar) y le da **Bluetooth y Wi-Fi directos** con vLinker/WiCAN, sin portátil. V200 y VCMI siguen por el portátil (en la app no salen esas opciones). Sin Internet muestra `sin-conexion.html`.
+- Plugins empaquetados en `apps/taller/lib/nativo.js` (`scripts/build-nativo.js`); `app.js` detecta la app (`NATIVA`) y usa `ble-nativo.js` / `wifi-nativo.js`. En el navegador todo sigue igual.
+- Compilación: `.github/workflows/diag-ios.yml` (TestFlight, necesita la app «Reyman Diag» creada en App Store Connect) y `diag-android.yml` (APK en la rama `apk-diag`).
 
 ### Pruebas
 - **104 pruebas automáticas.**

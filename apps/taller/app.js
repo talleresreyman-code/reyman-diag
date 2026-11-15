@@ -7,6 +7,8 @@ import { crearTransporteSerie, serieDisponible } from '@reyman/obd-core/transpor
 import { crearSimulador, COCHES_SIM } from '@reyman/obd-core/transport/simulador.js';
 import { crearTransporteWifi, WIFI_POR_DEFECTO } from '@reyman/obd-core/transport/wifi.js';
 import { crearTransporteJ2534 } from '@reyman/obd-core/transport/j2534.js';
+import { crearTransporteBleNativo } from '@reyman/obd-core/transport/ble-nativo.js';
+import { crearTransporteWifiNativo } from '@reyman/obd-core/transport/wifi-nativo.js';
 import { escanearCentralitas, leerTodasLasCentralitas, leerCentralita, borrarCentralita } from '@reyman/obd-core/obd/uds.js';
 import { decodificarVin } from '@reyman/obd-core/obd/vin.js';
 import { esFord, leerBateriaHibridaFord } from '@reyman/obd-core/marcas/ford.js';
@@ -21,8 +23,13 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.10';
+const VERSION = '0.4.11';
 const api = crearApi({ demo: DEMO });
+// App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
+// adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
+const NATIVA = !!window.Capacitor?.isNativePlatform?.();
+let modNativo = null;
+const nativo = async () => (modNativo ??= await import('./lib/nativo.js'));
 const $ = (s, el = document) => el.querySelector(s);
 const raiz = () => document.getElementById('app') || document.body;
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -134,18 +141,19 @@ function estadoBarra(txt, clase = '') {
 // ---------------------------------------------------------------------------
 function vConectar() {
   const el = $('#v-conectar');
-  const bt = bleDisponible();
-  const serie = serieDisponible();
+  const bt = NATIVA || bleDisponible();
+  const serie = !NATIVA && serieDisponible();
+  const wifi = NATIVA || conPuente();
   el.innerHTML = `
     <h1>Conectar con el coche</h1>
     <p class="conexion-intro suave">Enchufa el vLinker en la toma OBD, pon el contacto y elige cómo conectar.</p>
     <div id="con-progreso" class="panel" hidden></div>
     <div class="opciones-conexion">
-      <button class="opcion" data-con="ble" ${bt ? '' : 'disabled'}>${I.bt}<strong>Bluetooth</strong><span>${bt ? 'Móvil, tablet o portátil. Elige «vLinker» en la lista.' : !window.isSecureContext ? 'Necesita abrir la app por https://.' : 'Este navegador no permite Bluetooth. Usa Chrome.'}</span></button>
-      <button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234) o cable USB.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>
-      <button class="opcion" data-con="wifi" ${conPuente() ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
-      <button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel V200 (J2534)</strong><span>${conPuente() ? 'MaxiVCI V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
-      <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Otra interfaz Autel (VCMI…)</strong><span>${conPuente() ? `VCMI u otra interfaz J2534 instalada en el portátil.${otraJ2534() ? ` Última: ${esc(otraJ2534())}.` : ''}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      <button class="opcion" data-con="ble" ${bt ? '' : 'disabled'}>${I.bt}<strong>Bluetooth</strong><span>${NATIVA ? 'vLinker o WiCAN por Bluetooth. Elige el adaptador en la lista.' : bt ? 'Móvil, tablet o portátil. Elige «vLinker» en la lista.' : !window.isSecureContext ? 'Necesita abrir la app por https://.' : 'Este navegador no permite Bluetooth. Usa Chrome.'}</span></button>
+      ${NATIVA ? '' : `<button class="opcion" data-con="serie" ${serie ? '' : 'disabled'}>${I.usb}<strong>Puerto COM o USB</strong><span>${serie ? 'Portátil con Windows: vLinker emparejado (código 1234) o cable USB.' : 'Solo en Chrome o Edge de ordenador.'}</span></button>`}
+      <button class="opcion" data-con="wifi" ${wifi ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${NATIVA ? `WiCAN Pro u otro adaptador Wi-Fi, directo desde este dispositivo. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      ${NATIVA ? '' : `<button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel V200 (J2534)</strong><span>${conPuente() ? 'MaxiVCI V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
+      <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Otra interfaz Autel (VCMI…)</strong><span>${conPuente() ? `VCMI u otra interfaz J2534 instalada en el portátil.${otraJ2534() ? ` Última: ${esc(otraJ2534())}.` : ''}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>`}
       <button class="opcion" data-con="sim">${I.sim}<strong>Simulador</strong><span>Coche de prueba para aprender a usar la app sin adaptador.</span></button>
       <button class="opcion" data-con="consulta">${I.carpeta}<strong>Consultar lecturas guardadas</strong><span>Sin conectar al coche, por matrícula. Para la oficina.</span></button>
       <button class="opcion" data-con="grabaciones">${I.vivo}<strong>Ver datos grabados</strong><span>Pruebas de carretera guardadas o un archivo CSV/JSON (grabador, otros equipos). Sin conectar.</span></button>
@@ -528,7 +536,7 @@ function cfgWifi() {
 }
 function dialogoWifi() {
   const c = cfgWifi();
-  const d = dialogo(`<h3>Adaptador Wi-Fi</h3><p class="suave">Conecta el portátil a la red Wi-Fi del adaptador (WiFi_OBDII, WiCAN… ) y deja abierta la ventana del programa de enlace.</p>
+  const d = dialogo(`<h3>Adaptador Wi-Fi</h3><p class="suave">${NATIVA ? 'El adaptador y este dispositivo tienen que estar en la misma red Wi-Fi: la del propio adaptador (WiCAN…) o la del taller si el adaptador está conectado a ella.' : 'Conecta el portátil a la red Wi-Fi del adaptador (WiFi_OBDII, WiCAN… ) y deja abierta la ventana del programa de enlace.'}</p>
     <div class="campo"><label for="w-ip">Dirección del adaptador</label><input id="w-ip" value="${esc(c.host)}" inputmode="decimal"></div>
     <div class="campo"><label for="w-puerto">Puerto</label><input id="w-puerto" value="${esc(c.puerto)}" inputmode="numeric"></div>
     <p class="peq suave">Normalmente 192.168.0.10 y 35000. Algunos usan 192.168.4.1.</p>
@@ -551,7 +559,9 @@ async function conectar(tipo, coche) {
     if (estado.conectado) await desconectar(true);
     nuevaSesionAuto(tipo);
     paso('Buscando el adaptador…');
-    estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ puente: `ws://localhost:35001/j2534${coche ? `?dll=${encodeURIComponent(coche)}` : ''}`, log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
+    if (NATIVA && tipo === 'ble') estado.transporte = crearTransporteBleNativo({ BleClient: (await nativo()).BleClient });
+    else if (NATIVA && tipo === 'wifi') estado.transporte = crearTransporteWifiNativo({ TcpSocket: (await nativo()).TcpSocket, ...cfgWifi() });
+    else estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ puente: `ws://localhost:35001/j2534${coche ? `?dll=${encodeURIComponent(coche)}` : ''}`, log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
     await estado.transporte.conectar();
     estado.transporte.alDesconectarse(() => { estado.conectado = false; estadoBarra('Adaptador desconectado'); toast('Se ha perdido la conexión con el adaptador.'); });
     estado.elm = new Elm327(estado.transporte, { log, timeoutMs: tipo === 'j2534' ? 20000 : undefined });
@@ -567,7 +577,7 @@ async function conectar(tipo, coche) {
   } catch (e) {
     estado.conectado = false;
     estadoBarra('Sin conectar');
-    if (e.name === 'NotFoundError' || e.name === 'AbortError') { prog.hidden = true; estado.auto = null; return; }
+    if (e.name === 'NotFoundError' || e.name === 'AbortError' || /cancelada/.test(e.message)) { prog.hidden = true; estado.auto = null; return; }
     if (estado.auto) { estado.auto.error = e.message; guardarSesionAuto({ final: true }); }
     // Cambio de interfaz Autel: el enlace se reinicia solo; se vuelve a intentar sin que haya que pulsar nada
     if (/Cambiando de interfaz/.test(e.message) && !estado.reintentoJ2534) {
