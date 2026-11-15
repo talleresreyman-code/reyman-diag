@@ -51,6 +51,9 @@ jobs:
             -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -40
           echo "Compila bien. Falta la cuenta de desarrollador de Apple para firmar y subir a TestFlight."
+      - name: Identificador de la app en la cuenta de Apple
+        if: env.ASC_KEY_ID != ''
+        run: node scripts/registrar-bundle.mjs
       - name: Firmar y subir a TestFlight
         if: env.ASC_KEY_ID != ''
         working-directory: apps/taller-nativo/ios/App
