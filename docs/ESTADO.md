@@ -131,9 +131,18 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Nueva `apps/taller-nativo/` (Capacitor, `es.talleresreyman.diag`): abre https://diag.talleresreyman.es dentro de la app (mismo login de la App Reyman; se actualiza con el servidor, sin recompilar) y le da **Bluetooth y Wi-Fi directos** con vLinker/WiCAN, sin portátil. V200 y VCMI siguen por el portátil (en la app no salen esas opciones). Sin Internet muestra `sin-conexion.html`.
 - Plugins empaquetados en `apps/taller/lib/nativo.js` (`scripts/build-nativo.js`); `app.js` detecta la app (`NATIVA`) y usa `ble-nativo.js` / `wifi-nativo.js`. En el navegador todo sigue igual.
 - Compilación: `.github/workflows/diag-ios.yml` (TestFlight, necesita la app «Reyman Diag» creada en App Store Connect) y `diag-android.yml` (APK en la rama `apk-diag`).
+- 15/11/2026: app «Reyman Diag» creada en App Store Connect; primera subida a TestFlight 0.4.11 (compilación 3). El workflow da de alta solo el identificador (`scripts/registrar-bundle.mjs`).
+
+### 19. Reyman Connect 0.3: ficha del cliente con un toque (fase 1) (15/11/2026)
+- Sin base de datos nueva: la app usa el **mismo enlace personal de «Mi taller»** (`talleresreyman.com/mi-taller/?t=…`) y el flujo de n8n que ya lo sirve («Área clientes · Mi taller», webhooks `reyman-mitaller-datos` y `reyman-mitaller-doc`). En la app la petición va nativa (`CapacitorHttp`), porque n8n solo admite el origen talleresreyman.com en el navegador.
+- Bienvenida la primera vez: «Pegar mi enlace de WhatsApp» (lee el portapapeles), «Pedirlo por WhatsApp» o «Seguir sin taller». Al encontrar la ficha: «Hola, José… Entrar».
+- Enlace que abre la app ya vinculada: `reymanconnect://mitaller?t=…` (esquema dado de alta en iOS y Android con `preparar-nativo.mjs`) desde la página de n8n **«Reyman Connect · abrir la app»** (C6nUi80fw5HKwY3R, `n8n.talleresreyman.es/webhook/reyman-connect?t=…`, sin leer datos, sin coste).
+- Inicio: aviso del estado del coche en el taller («Terminado: puedes pasar a recogerlo», «En reparación»…). Mi taller: presupuestos pendientes (abre `mi-presupuesto`), coches con estado, km, última visita y próxima ITV, documentos PDF, WhatsApp/llamar, enviar estado y pedir cita (como antes). Se refresca al abrir la app y al entrar en Mi taller; la última copia se guarda en el móvil.
+- Código: `apps/cliente/src/cliente.js` (+ `@capacitor/app`, `@capacitor/clipboard`, `@capacitor/browser`). Pruebas: `test/connect-cliente.test.js`.
+- Pendiente: que el WhatsApp con el enlace de Mi taller lleve también el enlace de la app; QR en recepción; fases 2 (libro de mantenimiento) y 3 (citas y avisos).
 
 ### Pruebas
-- **104 pruebas automáticas.**
+- **107 pruebas automáticas.**
 
 ## Pendiente
 

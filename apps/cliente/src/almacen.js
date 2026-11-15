@@ -15,6 +15,9 @@ export const DATOS_INICIALES = {
   taller: null, // { codigo, ficha, consentimiento: { version, fecha } }
   adaptador: null, // { deviceId, nombre } para reconectar sin buscar
   conexion: { tipo: 'ble' }, // 'ble' (Bluetooth) o 'wifi' con { host, puerto } (WiCAN Pro: 192.168.0.10:35000)
+  cliente: null, // ficha en el taller: { token (enlace personal de Mi taller), nombre, desde }
+  clienteDatos: null, // última copia de Mi taller (vehículos, estado, documentos, presupuestos) para verla sin conexión
+  bienvenidaVista: false, // ya ha pasado por la pantalla de bienvenida
 };
 
 let memoria = null;

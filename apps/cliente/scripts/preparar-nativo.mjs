@@ -25,6 +25,16 @@ if (plataforma === 'android') {
     '<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />',
   ].filter((p) => !x.includes(p.match(/android:name="([^"]+)"/)[1] + '"'));
   x = x.replace('</manifest>', `    ${permisos.join('\n    ')}\n</manifest>`);
+  // Enlace reymanconnect://mitaller?t=… (página «abrir la app» del taller): abre la app ya vinculada
+  if (!x.includes('android:scheme="reymanconnect"')) {
+    x = x.replace(/(<activity[^>]*MainActivity[\s\S]*?)(<\/activity>)/, `$1    <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="reymanconnect" />
+            </intent-filter>
+        $2`);
+  }
   fs.writeFileSync(f, x);
   console.log(`AndroidManifest.xml: ${permisos.length} permisos añadidos`);
 } else if (plataforma === 'ios') {
@@ -35,6 +45,8 @@ if (plataforma === 'android') {
     NSLocalNetworkUsageDescription: 'Reyman Connect se conecta por Wi-Fi con el adaptador OBD de tu coche (por ejemplo, WiCAN Pro).',
   };
   for (const [k, v] of Object.entries(claves)) if (!x.includes(`<key>${k}</key>`)) x = x.replace(/<dict>/, `<dict>\n\t<key>${k}</key>\n\t<string>${v}</string>`);
+  // Enlace reymanconnect://mitaller?t=… (página «abrir la app» del taller): abre la app ya vinculada
+  if (!x.includes('<string>reymanconnect</string>')) x = x.replace(/<dict>/, '<dict>\n\t<key>CFBundleURLTypes</key>\n\t<array><dict><key>CFBundleURLName</key><string>es.talleresreyman.connect</string><key>CFBundleURLSchemes</key><array><string>reymanconnect</string></array></dict></array>');
   // Sin cifrado propio (solo HTTPS del sistema): así TestFlight no pregunta por la exportación en cada versión
   if (!x.includes('ITSAppUsesNonExemptEncryption')) x = x.replace(/<dict>/, '<dict>\n\t<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>');
   fs.writeFileSync(f, x);

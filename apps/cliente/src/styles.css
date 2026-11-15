@@ -130,3 +130,15 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .demo-ctl select { width: 100%; min-height: 44px; margin: 4px 0 8px; border-radius: 10px; border: 1px solid var(--linea); background: var(--superficie); padding: 0 10px; }
 .taller-ficha h2 { margin-bottom: 0; }
 .mini-taller strong { display: block; font-size: 1.1rem; }
+
+/* Bienvenida y ficha de cliente (enlace de Mi taller) */
+.bienvenida { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; padding: calc(24px + var(--sa-t)) 16px calc(24px + var(--sa-b)); background: linear-gradient(180deg, #143f7a 0%, #1d57a5 52%, var(--fondo) 52%); }
+.bienvenida .logo-b { width: 150px; background: #fff; border-radius: 14px; padding: 8px; margin: 0 auto 14px; display: block; }
+.bienvenida h1 { color: #fff; text-align: center; }
+.bienvenida .sub { color: #dbe7f7; text-align: center; margin-bottom: 20px; }
+.aviso-taller { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; cursor: pointer; border-left: 6px solid var(--azul); background: var(--azul-fondo); color: var(--texto); }
+.aviso-taller.verde { border-left-color: var(--verde); background: var(--verde-fondo); }
+.aviso-taller.ambar { border-left-color: var(--ambar); background: var(--ambar-fondo); }
+.presu { border-left: 6px solid var(--ambar); }
+.doc { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 0; border: 0; border-bottom: 1px solid var(--linea); background: none; cursor: pointer; }
+.doc:last-of-type { border-bottom: 0; }

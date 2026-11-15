@@ -8,11 +8,12 @@ import { peorGravedad, NIVELES } from '@reyman/obd-core/obd/gravedad.js';
 import { evaluarTension, medirArranque, HistorialBateria, avisosBateria, TIPOS_BATERIA, evaluarReposo } from '@reyman/obd-core/bateria.js';
 import { estadoMantenimiento, kmActuales } from '@reyman/obd-core/mantenimiento.js';
 import { COCHES_SIM } from '@reyman/obd-core/transport/simulador.js';
+import { tokenDeTexto, pedirDatos, urlDocumento, urlPresupuesto, abrir, leerPortapapeles, alAbrirEnlace, estadoCorto } from './cliente.js';
 
 const DEMO = globalThis.REYMAN_CONNECT_DEMO === true || new URLSearchParams(location.search).has('demo');
 const API = globalThis.REYMAN_CONNECT_API || 'https://diag.talleresreyman.es';
 const VERSION_CONSENTIMIENTO = '2026-11';
-const TALLER_DEMO = {
+const TALLER_DEMO = { // también es la ficha de Talleres Reyman al vincularse con el enlace de Mi taller
   codigo: 'REYMAN',
   ficha: { nombre: 'Talleres Reyman', marca: 'CGA Car Service', telefono: '665 942 470', whatsapp: '34665942470', email: 'talleresreyman@gmail.com', direccion: 'Camino del Puente Viejo, 1D (frente C/ Ávila), 28500 Arganda del Rey, Madrid', horario: 'Lunes a jueves 8:00–16:00 · Viernes 8:00–15:00', web: 'https://www.talleresreyman.com' },
 };
@@ -42,6 +43,8 @@ const st = {
   ocupado: null, // texto del progreso
   error: null,
   midiendo: null, // { muestras }
+  vincular: null, // enlace de Mi taller pendiente de confirmar: { token, datos } (o { error })
+  cargandoCliente: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -168,6 +171,7 @@ const VISTAS = [
 
 function pintar() {
   const raiz = document.getElementById('app');
+  if (st.vincular || (!st.datos.cliente && !st.datos.bienvenidaVista)) return pintarBienvenida(raiz);
   const v = st.vista;
   raiz.innerHTML = `
     <header class="cab">
@@ -215,6 +219,7 @@ function vInicio() {
   const rev = m.revision;
   const fichaMant = !rev ? ['gris', 'Sin configurar', 'Apunta tu última revisión'] : [nivelColor(rev.estado), rev.estado === 'vencida' ? 'Revisión vencida' : rev.kmRestantes !== null ? `Faltan ${fmtKm(Math.max(0, rev.kmRestantes))}` : `Faltan ${Math.max(0, rev.diasRestantes)} días`, `Toca antes del ${fmtFecha(rev.venceFecha)}`];
   return `
+    ${avisoTaller()}
     <section class="coche panel">
       <div class="coche-top">
         <div>
@@ -236,7 +241,8 @@ function vInicio() {
       ${ficha('mant', 'Mantenimiento', fichaMant)}
     </section>
     ${avisoLista(avisos)}
-    ${d.taller ? `<section class="panel mini-taller"><p class="etq">Mi taller</p><strong>${esc(d.taller.ficha.nombre)}</strong><div class="fila-btn"><a class="btn sec" href="tel:${esc(d.taller.ficha.telefono.replace(/\s/g, ''))}">${I.tel} Llamar</a><button class="btn sec" data-ir="taller">Pedir cita</button></div></section>` : `<section class="panel"><p><strong>¿Quieres que tu taller te avise?</strong></p><p class="suave peq">Vincula tu taller para enviarle las averías con un toque y pedir cita.</p><button class="btn sec" data-ir="taller">Vincular mi taller</button></section>`}
+    ${d.cliente ? '' : d.taller ? `<section class="panel mini-taller"><p class="etq">Mi taller</p><strong>${esc(d.taller.ficha.nombre)}</strong><div class="fila-btn"><a class="btn sec" href="tel:${esc(d.taller.ficha.telefono.replace(/\s/g, ''))}">${I.tel} Llamar</a><button class="btn sec" data-ir="taller">Pedir cita</button></div></section>` : `<section class="panel"><p><strong>¿Quieres que tu taller te avise?</strong></p><p class="suave peq">Vincula tu taller para enviarle las averías con un toque y pedir cita.</p><button class="btn sec" data-ir="taller">Vincular mi taller</button></section>`}
+    ${d.cliente ? `<section class="panel mini-taller"><p class="etq">Mi taller</p><strong>${esc(TALLER_DEMO.ficha.nombre)}</strong>${resumenCliente()}<div class="fila-btn"><button class="btn sec" data-ir="taller">${I.taller} Ver Mi taller</button><a class="btn sec" href="https://wa.me/${esc(TALLER_DEMO.ficha.whatsapp)}" target="_blank" rel="noopener">${I.wa} WhatsApp</a></div></section>` : ''}
     ${DEMO ? `<section class="panel demo-ctl"><label for="demo-coche" class="etq">Coche simulado</label><select id="demo-coche">${Object.entries(COCHES_SIM).map(([k, c]) => `<option value="${k}" ${k === (d.demoCoche || 'diesel') ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select><button class="enlace" id="demo-reset">Borrar los datos de la demostración</button></section>` : ''}`;
 }
 
@@ -530,12 +536,195 @@ function eMant(el) {
 }
 
 // ---------------------------------------------------------------------------
+// Ficha de cliente (enlace personal de Mi taller): bienvenida, vínculo y datos
+// ---------------------------------------------------------------------------
+const urlPedirEnlace = () => `https://wa.me/${TALLER_DEMO.ficha.whatsapp}?text=${encodeURIComponent('Hola, quiero mi enlace de cliente para la app Reyman Connect')}`;
+
+function pintarBienvenida(raiz) {
+  const v = st.vincular;
+  const coches = v?.datos?.vehiculos || [];
+  raiz.innerHTML = `<div class="bienvenida">
+    <img class="logo-b" src="${esc(globalThis.REYMAN_LOGO || 'logo.png')}" alt="Talleres Reyman">
+    <h1>${v?.datos ? `Hola, ${esc(nombreCorto(v.datos.cliente))}` : 'Bienvenido a Reyman Connect'}</h1>
+    <p class="sub">Tu coche y tu taller en el móvil</p>
+    ${v?.cargando ? '<div class="panel progreso" role="status"><span class="giro"></span>Buscando tu ficha en el taller…</div>' : ''}
+    ${v?.error ? `<div class="panel"><div class="aviso rojo" role="alert">${esc(v.error)}</div><div class="fila-btn col"><a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedir un enlace nuevo por WhatsApp</a><button class="btn fantasma" id="b-cancelar">Volver</button></div></div>` : ''}
+    ${v?.datos ? `<div class="panel">
+        <p>Hemos encontrado tu ficha de <strong>Talleres Reyman</strong>${coches.length ? ` con ${coches.length === 1 ? 'tu' : 'tus'} ${coches.slice(0, 3).map((c) => `${esc([c.marca, c.modelo].filter(Boolean).join(' '))} <span class="matricula">${esc(c.matricula)}</span>`).join(', ')}${coches.length > 3 ? '…' : ''}` : ''}.</p>
+        <button class="btn grande" id="b-entrar">Entrar</button>
+        <p class="peq suave centrado" style="margin-top:8px">Sin usuario ni contraseña. Al entrar, la app podrá enviar al taller las averías y el estado del coche cuando tú lo pidas.</p>
+        <button class="enlace centrado" id="b-cancelar">No soy yo</button>
+      </div>` : ''}
+    ${!v ? `<div class="panel">
+        <p><strong>¿Eres cliente de Talleres Reyman?</strong></p>
+        <p class="peq suave">Usa el enlace personal que te enviamos por WhatsApp: verás tus coches, la reparación, presupuestos y facturas.</p>
+        <div class="fila-btn col">
+          <button class="btn" id="b-pegar">Pegar mi enlace de WhatsApp</button>
+          <a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} No lo tengo: pedirlo por WhatsApp</a>
+        </div>
+      </div>
+      <div class="panel"><button class="btn fantasma" id="b-saltar" style="width:100%">Seguir sin taller</button><p class="peq suave centrado" style="margin-top:8px">Podrás comprobar tu coche igualmente y vincular el taller más tarde.</p></div>` : ''}
+  </div>`;
+  eBienvenidaBotones(raiz);
+  $('#b-saltar', raiz)?.addEventListener('click', async () => { st.datos.bienvenidaVista = true; await persistir(); pintar(); });
+  $('#b-cancelar', raiz)?.addEventListener('click', () => { st.vincular = null; pintar(); });
+  $('#b-entrar', raiz)?.addEventListener('click', confirmarVinculo);
+}
+
+function eBienvenidaBotones(el) {
+  $('#b-pegar', el)?.addEventListener('click', async () => {
+    const txt = await leerPortapapeles();
+    const t = tokenDeTexto(txt);
+    if (t) return prepararVinculo(t);
+    const manual = prompt('No encontramos el enlace en el portapapeles. Pégalo aquí (el que empieza por talleresreyman.com/mi-taller):', '');
+    const t2 = tokenDeTexto(manual);
+    if (t2) prepararVinculo(t2);
+    else if (manual !== null) toast('Ese enlace no es válido. Pídelo por WhatsApp y te lo enviamos.');
+  });
+}
+
+const nombreCorto = (n) => String(n || '').split(/\s+/)[0] || '';
+
+async function prepararVinculo(token) {
+  st.vincular = { token, cargando: true };
+  pintar();
+  try {
+    const datos = await pedirDatos(token, { demo: DEMO });
+    st.vincular = { token, datos };
+  } catch (e) {
+    st.vincular = { token, error: e.message };
+  }
+  pintar();
+}
+
+async function confirmarVinculo() {
+  const { token, datos } = st.vincular || {};
+  if (!datos) return;
+  const d = st.datos;
+  d.cliente = { token, nombre: datos.cliente || '', desde: new Date().toISOString() };
+  d.clienteDatos = datos;
+  d.bienvenidaVista = true;
+  d.taller = { codigo: TALLER_DEMO.codigo, ficha: TALLER_DEMO.ficha, consentimiento: { version: VERSION_CONSENTIMIENTO, fecha: new Date().toISOString(), via: 'enlace' } };
+  if (!d.contacto?.nombre && datos.cliente) d.contacto = { ...(d.contacto || {}), nombre: datos.cliente };
+  // Si la app aún no sabe qué coche es, el primero de la ficha (el que está en el taller o el último que vino)
+  const c = datos.vehiculos?.[0];
+  if (c && !d.vehiculo?.matricula) d.vehiculo = { ...(d.vehiculo || {}), matricula: c.matricula, marca: c.marca, alias: [c.marca, c.modelo].filter(Boolean).join(' ') };
+  if (c?.km && !d.kmLecturas.length && Number(c.km) > 0) d.kmLecturas.push({ fecha: new Date().toISOString(), km: Number(c.km), origen: 'taller' });
+  st.vincular = null;
+  st.vista = 'inicio';
+  await persistir();
+  toast('¡Listo! Ya tienes tu taller en la app.');
+  pintar();
+}
+
+async function refrescarCliente() {
+  const c = st.datos.cliente;
+  if (!c || st.cargandoCliente) return;
+  st.cargandoCliente = true;
+  try {
+    st.datos.clienteDatos = await pedirDatos(c.token, { demo: DEMO });
+    await persistir();
+    if (!document.querySelector('dialog[open]')) pintar();
+  } catch { /* se queda la última copia */ }
+  st.cargandoCliente = false;
+}
+
+/** Coche del cliente en el taller ahora mismo (terminado primero). */
+function cocheEnCurso() {
+  const vs = st.datos.clienteDatos?.vehiculos || [];
+  return vs.find((v) => v.estado?.terminado) || vs.find((v) => v.estado) || null;
+}
+
+function avisoTaller() {
+  const v = cocheEnCurso();
+  const e = estadoCorto(v);
+  if (!e) return '';
+  return `<button class="panel aviso-taller ${e.color}" data-ir="taller">
+    <strong>${e.color === 'verde' ? '✅ ' : ''}${esc(e.texto)}</strong>
+    <span class="peq">${esc([v.marca, v.modelo].filter(Boolean).join(' '))} · ${esc(v.matricula)}${e.extra ? ` · ${esc(e.extra)}` : ''}</span>
+  </button>`;
+}
+
+function resumenCliente() {
+  const d = st.datos.clienteDatos;
+  if (!d) return '';
+  const p = d.presupuestos?.length || 0;
+  return `<p class="peq suave">${d.vehiculos?.length || 0} ${d.vehiculos?.length === 1 ? 'coche' : 'coches'}${p ? ` · <strong class="peligro-txt">${p} ${p === 1 ? 'presupuesto pendiente' : 'presupuestos pendientes'}</strong>` : ''}</p>`;
+}
+
+const fechaDoc = (s) => (s ? new Date(`${s}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+const kmTxt = (k) => (Number(k) > 0 ? fmtKm(Number(k)) : '');
+
+function vTallerCliente() {
+  const d = st.datos.clienteDatos || { vehiculos: [], documentos: [], presupuestos: [] };
+  const f = TALLER_DEMO.ficha;
+  const docs = d.documentos || [];
+  return `<h1>Mi taller</h1>
+    ${st.cargandoCliente && !st.datos.clienteDatos ? '<div class="panel progreso"><span class="giro"></span>Cargando tus datos…</div>' : ''}
+    ${(d.presupuestos || []).map((p) => `<section class="panel presu">
+      <p class="etq">Presupuesto pendiente</p>
+      <strong>${esc(p.vehiculo || '')} <span class="matricula">${esc(p.matricula || '')}</span></strong>
+      <p class="peq suave">Nº ${esc(p.num || '')}</p>
+      <button class="btn" data-presu="${esc(p.token)}">Ver y responder</button>
+    </section>`).join('')}
+    ${(d.vehiculos || []).map((v) => { const e = estadoCorto(v); return `<section class="panel vehiculo">
+      <div class="coche-top"><div><strong>${esc([v.marca, v.modelo].filter(Boolean).join(' '))}</strong><br><span class="matricula">${esc(v.matricula)}</span></div>${v.en_taller ? '<span class="insignia ambar">En el taller</span>' : ''}</div>
+      ${e ? `<div class="aviso ${e.color === 'verde' ? 'verde' : e.color === 'ambar' ? 'ambar' : ''}" style="margin-top:10px"><strong>${esc(e.texto)}</strong>${e.extra ? `<br><span class="peq">${esc(e.extra)}</span>` : ''}${e.motivo ? `<br><span class="peq">${esc(e.motivo)}</span>` : ''}</div>` : ''}
+      <p class="peq suave" style="margin-top:8px">${v.ultima_visita ? `Última visita: ${esc(v.ultima_visita)}${kmTxt(v.km) ? ` · ${esc(kmTxt(v.km))}` : ''}` : ''}${v.ultimo_trabajo ? `<br>${esc(v.ultimo_trabajo)}` : ''}</p>
+      ${v.proxima_itv || v.itv_cliente ? `<p class="peq"><strong>Próxima ITV:</strong> ${esc(v.proxima_itv || v.itv_cliente)}</p>` : ''}
+    </section>`; }).join('')}
+    ${docs.length ? `<section class="panel"><p class="etq">Documentos</p>
+      ${docs.slice(0, 15).map((x) => `<button class="doc" data-doc="${esc(x.id)}"><span><strong>${esc(x.tipo)}</strong> · ${esc(x.nombre)}<br><span class="peq suave">${esc(fechaDoc(x.fecha))}${x.matriculas?.length ? ` · ${esc(x.matriculas.join(', '))}` : ''}</span></span><span class="enlace">PDF</span></button>`).join('')}
+      ${docs.length > 15 ? `<p class="peq suave">Y ${docs.length - 15} más.</p>` : ''}
+    </section>` : ''}
+    <section class="panel taller-ficha">
+      <h2>${esc(f.nombre)}</h2>
+      <p class="peq">${esc(f.direccion)}</p>
+      <p class="peq suave">${esc(f.horario)}</p>
+      <div class="fila-btn">
+        <a class="btn sec" href="https://wa.me/${esc(f.whatsapp)}" target="_blank" rel="noopener">${I.wa} WhatsApp</a>
+        <a class="btn sec" href="tel:${esc(f.telefono.replace(/\s/g, ''))}">${I.tel} Llamar</a>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Enviar el estado del coche</h2>
+      <p class="suave peq">Se envían las averías, los km y la batería de la última comprobación${ultimaLectura() ? ` (${esc(fmtFechaHora(ultimaLectura().fecha))})` : ''}.</p>
+      <button class="btn" id="t-estado" ${ultimaLectura() ? '' : 'disabled'}>Enviar al taller</button>
+    </section>
+    <section class="panel">
+      <h2>Pedir cita</h2>
+      <label class="campo"><span>Tu nombre</span><input id="c-nombre" autocomplete="name" value="${esc(st.datos.contacto?.nombre || '')}"></label>
+      <label class="campo"><span>Tu teléfono</span><input id="c-tel" type="tel" autocomplete="tel" value="${esc(st.datos.contacto?.telefono || '')}"></label>
+      <label class="campo"><span>¿Qué le pasa al coche? (opcional)</span><textarea id="c-msg" rows="3" maxlength="1000"></textarea></label>
+      <button class="btn" id="t-cita">Pedir cita</button>
+      <p class="peq suave">El taller te llamará para darte día y hora.</p>
+    </section>
+    <p class="peq suave">${d.actualizado ? `Actualizado: ${esc(fmtFechaHora(d.actualizado))}. ` : ''}<button class="enlace" id="t-recargar">Actualizar</button> · <button class="enlace" id="t-quitar">Quitar mi ficha de esta app</button></p>`;
+}
+
+function eTallerCliente(el) {
+  if (!st.datos.cliente) return;
+  const tok = st.datos.cliente.token;
+  el.querySelectorAll('[data-doc]').forEach((b) => b.addEventListener('click', () => (DEMO ? toast('En la demostración no hay PDF.') : abrir(urlDocumento(tok, b.dataset.doc)))));
+  el.querySelectorAll('[data-presu]').forEach((b) => b.addEventListener('click', () => (DEMO ? toast('En la demostración no hay presupuesto.') : abrir(urlPresupuesto(b.dataset.presu)))));
+  $('#t-recargar', el)?.addEventListener('click', async () => { await refrescarCliente(); toast('Datos actualizados.'); });
+  const age = Date.now() - new Date(st.datos.clienteDatos?.actualizado || 0).getTime();
+  if (age > 120000) refrescarCliente();
+}
+
+// ---------------------------------------------------------------------------
 // Mi taller
 // ---------------------------------------------------------------------------
 function vTaller() {
   const t = st.datos.taller;
+  if (st.datos.cliente) return vTallerCliente();
   if (!t) {
     return `<h1>Mi taller</h1>
+      <section class="panel">
+        <p><strong>¿Eres cliente de Talleres Reyman?</strong></p>
+        <p class="peq suave">Con tu enlace personal de WhatsApp verás tus coches, en qué punto está la reparación, tus presupuestos y facturas.</p>
+        <div class="fila-btn col"><button class="btn" id="b-pegar">Pegar mi enlace de WhatsApp</button><a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedir mi enlace por WhatsApp</a></div>
+      </section>
       <section class="panel">
         <p>Vincula tu taller para enviarle las averías y el estado del coche con un toque, y pedir cita.</p>
         <label class="campo"><span>Código del taller</span><input id="t-codigo" autocapitalize="characters" placeholder="REYMAN" value="REYMAN"></label>
@@ -572,6 +761,8 @@ function vTaller() {
 }
 
 function eTaller(el) {
+  eBienvenidaBotones(el);
+  eTallerCliente(el);
   $('#t-buscar', el)?.addEventListener('click', async () => {
     const codigo = $('#t-codigo', el).value.trim().toUpperCase();
     if (!codigo) return;
@@ -589,7 +780,10 @@ function eTaller(el) {
     st.datos.contacto = { nombre, telefono };
     enviarAlTaller('cita', { contacto: { nombre, telefono }, mensaje: $('#c-msg', el).value.trim() });
   });
-  $('#t-quitar', el)?.addEventListener('click', async () => { st.datos.taller = null; await persistir(); toast('Taller desvinculado.'); pintar(); });
+  $('#t-quitar', el)?.addEventListener('click', async () => {
+    if (st.datos.cliente && !confirm('¿Quitar tu ficha de Talleres Reyman de esta app? Podrás volver a entrar con tu enlace de WhatsApp.')) return;
+    st.datos.taller = null; st.datos.cliente = null; st.datos.clienteDatos = null; await persistir(); toast('Taller desvinculado.'); pintar();
+  });
 }
 
 function dialogoConsentimiento(codigo, ficha) {
@@ -645,7 +839,13 @@ async function iniciar() {
   window.__reymanArrancada = true; // para el aviso de «no ha podido arrancar» de index.html
   if (!st.datos.conexion) st.datos.conexion = { tipo: 'ble' };
   if (!DEMO && !esNativa() && !formasDeConectar().webBle) st.error = 'Este navegador no permite Bluetooth. Usa la app Reyman Connect o Chrome en Android.';
+  // Enlace de Mi taller en la propia URL (pruebas en el navegador: ?t=…)
+  const tUrl = tokenDeTexto(location.search);
+  if (tUrl && tUrl !== st.datos.cliente?.token) prepararVinculo(tUrl);
   pintar();
+  alAbrirEnlace((url) => { const t = tokenDeTexto(url); if (t && t !== st.datos.cliente?.token) prepararVinculo(t); });
+  if (st.datos.cliente) refrescarCliente();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.datos.cliente) refrescarCliente(); });
 }
 
 iniciar();
