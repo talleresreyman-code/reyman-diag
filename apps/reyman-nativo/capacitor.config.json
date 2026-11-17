@@ -1,0 +1,15 @@
+{
+  "appId": "es.talleresreyman.app",
+  "appName": "Reyman",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.talleresreyman.es",
+    "allowNavigation": ["talleresreyman.es", "*.talleresreyman.es"],
+    "errorPath": "sin-conexion.html"
+  },
+  "ios": { "contentInset": "never", "backgroundColor": "#1F2732" },
+  "android": { "backgroundColor": "#1F2732" },
+  "plugins": {
+    "SystemBars": { "initialViewportFitValueHint": "cover" }
+  }
+}

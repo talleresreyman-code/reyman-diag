@@ -25,6 +25,12 @@ if (plataforma === 'android') {
     '<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />',
   ].filter((p) => !x.includes(p.match(/android:name="([^"]+)"/)[1] + '"'));
   x = x.replace('</manifest>', `    ${permisos.join('\n    ')}\n</manifest>`);
+  // reymandiag://…  → abre Reyman Diag (desde la App Reyman, con la OT y la matrícula)
+  if (!x.includes('android:scheme="reymandiag"')) {
+    x = x.replace(/(<activity[\s\S]*?<\/intent-filter>)/, '$1\n            <intent-filter>\n                <action android:name="android.intent.action.VIEW" />\n                <category android:name="android.intent.category.DEFAULT" />\n                <category android:name="android.intent.category.BROWSABLE" />\n                <data android:scheme="reymandiag" />\n            </intent-filter>');
+  }
+  // Android 11+: poder abrir la App Reyman (reyman://)
+  if (!x.includes('<queries>')) x = x.replace('</manifest>', '    <queries>\n        <intent><action android:name="android.intent.action.VIEW" /><data android:scheme="reyman" /></intent>\n    </queries>\n</manifest>');
   // La API del WiCAN Pro va por http:// en la red local (192.168.0.10)
   if (!x.includes('usesCleartextTraffic')) x = x.replace('<application ', '<application android:usesCleartextTraffic="true" ');
   fs.writeFileSync(f, x);
@@ -41,8 +47,11 @@ if (plataforma === 'android') {
   if (!x.includes('<key>NSAppTransportSecurity</key>')) x = x.replace(/<dict>/, '<dict>\n\t<key>NSAppTransportSecurity</key>\n\t<dict>\n\t\t<key>NSAllowsLocalNetworking</key>\n\t\t<true/>\n\t</dict>');
   // Sin cifrado propio (solo HTTPS del sistema): así TestFlight no pregunta por la exportación en cada versión
   if (!x.includes('ITSAppUsesNonExemptEncryption')) x = x.replace(/<dict>/, '<dict>\n\t<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>');
+  // reymandiag:// abre esta app (desde la App Reyman); puede abrir reyman:// (volver a la App Reyman)
+  if (!x.includes('<key>CFBundleURLTypes</key>')) x = x.replace(/<dict>/, '<dict>\n\t<key>CFBundleURLTypes</key>\n\t<array><dict><key>CFBundleURLName</key><string>es.talleresreyman.diag</string><key>CFBundleURLSchemes</key><array><string>reymandiag</string></array></dict></array>');
+  if (!x.includes('<key>LSApplicationQueriesSchemes</key>')) x = x.replace(/<dict>/, '<dict>\n\t<key>LSApplicationQueriesSchemes</key>\n\t<array><string>reyman</string></array>');
   fs.writeFileSync(f, x);
-  console.log('Info.plist: permisos de Bluetooth y red local');
+  console.log('Info.plist: permisos de Bluetooth y red local · enlace reymandiag://');
 } else {
   console.error('Uso: node scripts/preparar-nativo.mjs android|ios');
   process.exit(1);

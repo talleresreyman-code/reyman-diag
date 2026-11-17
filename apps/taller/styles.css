@@ -73,6 +73,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .barra .usuario { font-size: 14px; opacity: 0.85; white-space: nowrap; }
 .barra .estado span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 52vw; }
 @media (max-width: 520px) { .barra .usuario { display: none; } }
+.barra .volver-app { min-height: 36px; padding: 0 10px; font-size: 13px; color: #fff; border-color: rgba(255,255,255,.5); white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; }
 
 /* ---------- Contenedor ---------- */
 main { max-width: 760px; margin: 0 auto; padding-block: 16px 112px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }

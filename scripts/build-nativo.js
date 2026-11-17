@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const RAIZ = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 await build({
   stdin: {
-    contents: "export { Capacitor } from '@capacitor/core';\nexport { BleClient } from '@capacitor-community/bluetooth-le';\nexport { TcpSocket } from 'capacitor-tcp-socket';\n",
+    contents: "export { Capacitor } from '@capacitor/core';\nexport { BleClient } from '@capacitor-community/bluetooth-le';\nexport { TcpSocket } from 'capacitor-tcp-socket';\nexport { App } from '@capacitor/app';\n",
     resolveDir: path.join(RAIZ, 'apps', 'taller-nativo'),
     loader: 'js',
   },

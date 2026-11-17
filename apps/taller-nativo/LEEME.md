@@ -8,6 +8,11 @@ Es la misma Reyman Diag de https://diag.talleresreyman.es, pero instalada como a
   - por Wi-Fi: WiCAN Pro, normalmente en 192.168.0.10:35000.
 - **El Autel V200 y la VCMI siguen yendo por el portátil**, con el programa de enlace. En la app instalada esas opciones no salen.
 
+## Enlace con la App Reyman
+- La App Reyman (app «Reyman», `apps/reyman-nativo`) abre esta app con `reymandiag://abrir?ot=…&mat=…&vin=…`: sale la cinta «Desde la App Reyman» y, al leer el coche, se propone esa OT.
+- «← App Reyman», arriba, vuelve a la App Reyman (`reyman://`).
+- Usa el plugin `@capacitor/app` (empaquetado en `apps/taller/lib/nativo.js`).
+
 ## Cuándo hay que compilar la app
 Solo hay que compilarla si cambia esta carpeta: permisos, plugins, icono o dirección del servidor.
 

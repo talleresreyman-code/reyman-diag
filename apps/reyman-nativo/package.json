@@ -1,0 +1,15 @@
+{
+  "name": "reyman-app-nativa",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "App Reyman · app de taller instalable (iPhone, iPad y Android). Abre app.talleresreyman.es dentro de la app; enlazada con Reyman Diag.",
+  "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
+    "@capacitor/ios": "^8.6.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.0"
+  }
+}

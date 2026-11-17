@@ -1,4 +1,4 @@
-# Reyman Diag · Reyman Connect · estado (15/11/2026, v0.4.14)
+# Reyman Diag · Reyman Connect · estado (17/11/2026, v0.4.15)
 
 Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba disponible: la conexión Wi-Fi se ha rehecho a partir del programa de enlace).
 
@@ -162,6 +162,12 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - **Bluetooth:** en el servicio FFF0 se coge siempre FFF1 (notificación) + FFF2 (escritura): el firmware 6 del WiCAN pone ahí también la API (FFF3/FFF4) y J2534 (FFF5/FFF6). En la web, el filtro también busca «WiCAN».
 - Probado en Chrome con un enlace y un WiCAN 4.50 falsos: «Comprobar WiCAN», conexión con nombre en la barra y bloqueo con explicación si el WiCAN está en «realdash66».
 - Pendiente de probar con el WiCAN real: Wi-Fi, «Comprobar WiCAN», USB-C (qué puerto COM y qué velocidad) y Bluetooth en la app instalada (recompilar la app para los permisos de red local).
+
+### 23. App Reyman instalable y enlazada con Reyman Diag → v0.4.15 (17/11/2026)
+- **App Reyman** como app de iPhone/iPad y Android (`apps/reyman-nativo`, `es.talleresreyman.app`, nombre «Reyman»): carcasa de Capacitor que abre app.talleresreyman.es por dentro, igual que Reyman Diag. Se compila con `app-reyman-ios.yml` (TestFlight, mismos secretos) y `app-reyman-android.yml` (APK en la rama `apk-app`). Icono «R» de la App Reyman. Permisos de cámara, fotos y micrófono (fotos y vídeos de las OT).
+- **Dos apps enlazadas**: la App Reyman abre Reyman Diag con `reymandiag://abrir?ot=…&mat=…&vin=…` (botón «🩺 Abrir Reyman Diag con este coche» de la OT; si Diag no está instalada, abre la web). Reyman Diag vuelve con «← App Reyman» (`reyman://`).
+- **Reyman Diag** lee la OT pedida de la dirección (`?ot=&mat=&vin=`, también en la web) o del enlace (`@capacitor/app`, añadido a `lib/nativo.js`), enseña una cinta «Desde la App Reyman: OT … · matrícula» y, al leer el coche, propone esa OT para guardar la lectura. Hay que recompilar la app Diag (esquema `reymandiag` y plugin App).
+- Pendiente: notificaciones nativas en la app «Reyman» (dentro de la app no funcionan las notificaciones web).
 
 ### Pruebas
 - **121 pruebas automáticas.**

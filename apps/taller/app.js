@@ -24,7 +24,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.14';
+const VERSION = '0.4.15';
 const api = crearApi({ demo: DEMO });
 // App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
 // adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
@@ -85,12 +85,45 @@ async function arrancar() {
     toast(`No se pudo contactar con el servidor: ${e.message}`);
     estado.yo = { usuario: { nombre: 'Sin conexión' }, permisos: ['diag.ver', 'diag.leer'] };
   }
+  otPedidaDe(location.href);
   pintarMarco();
   ir('conectar');
   buscarPuente();
+  enlacesNativos();
   // Si se abre el programa de enlace después, se detecta solo
   setInterval(() => { if (!estado.puente && !estado.conectado) buscarPuente(); }, 10000);
   if ('serviceWorker' in navigator && !DEMO) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Enlace con la App Reyman: «🩺 Abrir Reyman Diag con este coche» llega con ?ot=&mat=&vin= (web) o como
+// reymandiag://abrir?ot=…&mat=…&vin=… (app instalada). La OT se propone al leer el coche.
+// En la app instalada, «← App Reyman» vuelve a la App Reyman (reyman://).
+// ---------------------------------------------------------------------------
+function otPedidaDe(url) {
+  let q;
+  try { q = new URL(url).searchParams; } catch { return false; }
+  const ot = (q.get('ot') || '').trim(), mat = (q.get('mat') || '').replace(/[\s-]/g, '').toUpperCase(), vin = (q.get('vin') || '').trim().toUpperCase();
+  if (!ot && !mat) return false;
+  estado.otPedida = { ot, mat, vin };
+  return true;
+}
+function cintaOt() {
+  const c = document.getElementById('cinta-ot');
+  if (!c) return;
+  const p = estado.otPedida;
+  c.hidden = !p;
+  if (p) c.textContent = `Desde la App Reyman: ${p.ot ? `OT ${p.ot}` : ''}${p.ot && p.mat ? ' · ' : ''}${p.mat ? formatoMatricula(p.mat) : ''}. Al leer el coche se guarda en esa OT.`;
+}
+async function enlacesNativos() {
+  cintaOt();
+  if (!NATIVA) return;
+  try {
+    const { App } = await nativo();
+    const l = await App.getLaunchUrl();
+    if (l?.url && otPedidaDe(l.url)) cintaOt();
+    App.addListener('appUrlOpen', (e) => { if (otPedidaDe(e.url)) { cintaOt(); toast('Coche recibido de la App Reyman'); } });
+  } catch { /* app sin el plugin App: versión anterior */ }
 }
 
 function pintarMarco() {
@@ -100,7 +133,9 @@ function pintarMarco() {
       <div class="marca">Reyman <small>Diag</small></div>
       <button type="button" class="estado" id="ir-conectar" title="Conexión, prueba de batería y registro"><span class="punto" id="punto"></span><span id="estado-txt">Sin conectar</span></button>
       <div class="usuario">${esc(estado.yo?.usuario?.nombre || '')}</div>
+      ${NATIVA ? '<a class="btn fantasma volver-app" href="reyman://" title="Volver a la App Reyman">← App Reyman</a>' : ''}
     </header>
+    <div class="demo-cinta" id="cinta-ot" hidden></div>
     <main id="main">
       <section class="vista" id="v-conectar"></section>
       <section class="vista" id="v-vehiculo" hidden></section>
@@ -742,6 +777,14 @@ async function leerTodo() {
       const r = await api.buscarOt({ vin: l.vehiculo.vin });
       estado.coincidencias = r.coincidencias || [];
       estado.abiertas = r.abiertas || [];
+    } catch { /* sin servidor */ }
+  }
+  const p = estado.otPedida;
+  if (p && !estado.coincidencias.some((c) => String(c.matricula || '').replace(/[\s-]/g, '').toUpperCase() === p.mat || (p.ot && String(c.ot) === p.ot))) {
+    try {
+      const r = await api.buscarOt(p.mat ? { matricula: p.mat } : { vin: p.vin });
+      estado.coincidencias = (r.coincidencias || []).concat(estado.coincidencias);
+      if (!estado.abiertas?.length) estado.abiertas = r.abiertas || [];
     } catch { /* sin servidor */ }
   }
   ir('vehiculo');
