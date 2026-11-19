@@ -4,12 +4,24 @@
   "webDir": "www",
   "server": {
     "url": "https://app.talleresreyman.es",
-    "allowNavigation": ["talleresreyman.es", "*.talleresreyman.es"],
+    "allowNavigation": [
+      "talleresreyman.es",
+      "*.talleresreyman.es"
+    ],
     "errorPath": "sin-conexion.html"
   },
-  "ios": { "contentInset": "never", "backgroundColor": "#1F2732" },
-  "android": { "backgroundColor": "#1F2732" },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#1F2732",
+    "appendUserAgent": "ReymanApp/ubicacion"
+  },
+  "android": {
+    "backgroundColor": "#1F2732",
+    "appendUserAgent": "ReymanApp/ubicacion"
+  },
   "plugins": {
-    "SystemBars": { "initialViewportFitValueHint": "cover" }
+    "SystemBars": {
+      "initialViewportFitValueHint": "cover"
+    }
   }
 }

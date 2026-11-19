@@ -1,5 +1,6 @@
 // App Reyman (app instalable) · prepara los proyectos nativos después de «npx cap add android|ios»
 // (las carpetas android/ e ios/ no se guardan en el repositorio): permisos de cámara y fotos (fotos y vídeos de las OT),
+// ubicación (fichaje de jornada, 19/11/2026),
 // enlace «reyman://» (para que Reyman Diag pueda volver a la App Reyman) e icono.
 //   node scripts/preparar-nativo.mjs android
 //   node scripts/preparar-nativo.mjs ios
@@ -21,6 +22,8 @@ if (plataforma === 'android') {
     '<uses-permission android:name="android.permission.CAMERA" />',
     '<uses-permission android:name="android.permission.RECORD_AUDIO" />',
     '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+    '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
+    '<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />',
   ].filter((p) => !x.includes(p.match(/android:name="([^"]+)"/)[1] + '"'));
   x = x.replace('</manifest>', `    ${permisos.join('\n    ')}\n</manifest>`);
   // reyman://  → abre la App Reyman
@@ -48,6 +51,8 @@ if (plataforma === 'android') {
     NSMicrophoneUsageDescription: 'La App Reyman usa el micrófono al grabar vídeos de las órdenes de trabajo.',
     NSPhotoLibraryUsageDescription: 'La App Reyman usa tus fotos para añadirlas a las órdenes de trabajo.',
     NSPhotoLibraryAddUsageDescription: 'La App Reyman guarda en tus fotos las imágenes que descargas.',
+    // Fichaje de jornada: si el taller lo activa, se comprueba que se ficha en el taller (sin esta clave iOS cierra la app al pedir la ubicación)
+    NSLocationWhenInUseUsageDescription: 'La App Reyman comprueba al fichar la jornada si estás en el taller (solo si el taller lo tiene activado).',
   };
   for (const [k, v] of Object.entries(claves)) if (!x.includes(`<key>${k}</key>`)) x = x.replace(/<dict>/, `<dict>\n\t<key>${k}</key>\n\t<string>${v}</string>`);
   // Sin cifrado propio (solo HTTPS del sistema): TestFlight no pregunta por la exportación en cada versión
@@ -62,7 +67,7 @@ if (plataforma === 'android') {
   for (const a of fs.readdirSync(set)) if (a.endsWith('.png')) fs.unlinkSync(path.join(set, a));
   fs.copyFileSync(path.join(ASSETS, 'icono-1024.png'), path.join(set, 'AppIcon-1024.png'));
   fs.writeFileSync(path.join(set, 'Contents.json'), JSON.stringify({ images: [{ filename: 'AppIcon-1024.png', idiom: 'universal', platform: 'ios', size: '1024x1024' }], info: { author: 'xcode', version: 1 } }, null, 2));
-  console.log('Info.plist: cámara, fotos, micrófono y enlace ' + ESQUEMA + ':// · icono');
+  console.log('Info.plist: cámara, fotos, micrófono, ubicación y enlace ' + ESQUEMA + ':// · icono');
 } else {
   console.error('Uso: node scripts/preparar-nativo.mjs android|ios');
   process.exit(1);
