@@ -70,9 +70,11 @@ jobs:
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID CODE_SIGN_STYLE=Automatic CODE_SIGNING_ALLOWED=NO \
             MARKETING_VERSION=$V CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             archive | tail -40
-          # Notificaciones: comprobar que el archivo lleva el permiso aps-environment (lo usa Apple al firmar)
-          X=$(find $RUNNER_TEMP/App.xcarchive -name 'archived-expanded-entitlements.xcent' | head -1)
-          if [ -n "$X" ] && grep -q aps-environment "$X"; then echo "Permiso de notificaciones en el archivo: sí"; else echo "::warning::El archivo no lleva aps-environment (${X:-sin xcent}): las notificaciones pueden no funcionar"; fi
+          # Notificaciones: el archivo se compila sin firmar y entonces no guarda sus permisos (entitlements).
+          # Apple firma al exportar con los del archivo «archived-expanded-entitlements.xcent»: se pone a mano
+          # el de App/App.entitlements (aps-environment) para que la firma lleve el permiso de notificaciones.
+          APPX=$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app
+          if ! grep -qs aps-environment "$APPX/archived-expanded-entitlements.xcent"; then cp App/App.entitlements "$APPX/archived-expanded-entitlements.xcent"; echo "Permisos añadidos al archivo"; fi
           cat > $RUNNER_TEMP/export.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -83,6 +85,15 @@ jobs:
             <key>signingStyle</key><string>automatic</string>
           </dict></plist>
           PLIST
+          # Comprobación: exportar sin subir y mirar los permisos con los que firma Apple
+          sed 's#<string>upload</string>#<string>export</string>#' $RUNNER_TEMP/export.plist > $RUNNER_TEMP/export-local.plist
+          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/App.xcarchive \
+            -exportOptionsPlist $RUNNER_TEMP/export-local.plist -exportPath $RUNNER_TEMP/local \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 \
+            -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID | tail -5
+          (cd $RUNNER_TEMP/local && unzip -oq *.ipa && codesign -d --entitlements - Payload/App.app 2>/dev/null | grep -A1 aps-environment) \
+            && echo "Firmada con permiso de notificaciones" || echo "::warning::La app firmada no lleva aps-environment: las notificaciones no funcionarán"
           xcodebuild -exportArchive -archivePath $RUNNER_TEMP/App.xcarchive \
             -exportOptionsPlist $RUNNER_TEMP/export.plist -exportPath $RUNNER_TEMP/export \
             -allowProvisioningUpdates \
