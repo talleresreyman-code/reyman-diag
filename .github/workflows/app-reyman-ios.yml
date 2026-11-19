@@ -70,6 +70,9 @@ jobs:
             DEVELOPMENT_TEAM=$APPLE_TEAM_ID CODE_SIGN_STYLE=Automatic CODE_SIGNING_ALLOWED=NO \
             MARKETING_VERSION=$V CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             archive | tail -40
+          # Notificaciones: comprobar que el archivo lleva el permiso aps-environment (lo usa Apple al firmar)
+          X=$(find $RUNNER_TEMP/App.xcarchive -name 'archived-expanded-entitlements.xcent' | head -1)
+          if [ -n "$X" ] && grep -q aps-environment "$X"; then echo "Permiso de notificaciones en el archivo: sí"; else echo "::warning::El archivo no lleva aps-environment (${X:-sin xcent}): las notificaciones pueden no funcionar"; fi
           cat > $RUNNER_TEMP/export.plist <<PLIST
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

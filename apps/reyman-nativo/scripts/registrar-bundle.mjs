@@ -21,6 +21,16 @@ if (lista.data?.some((b) => b.attributes.identifier === cfg.appId)) {
   const c = await fetch(`${API}/bundleIds`, { method: 'POST', headers: H, body: JSON.stringify({ data: { type: 'bundleIds', attributes: { identifier: cfg.appId, name: cfg.appName, platform: 'IOS' } } }) });
   console.log(c.ok ? `Identificador ${cfg.appId} dado de alta` : `No se ha podido dar de alta: ${c.status} ${await c.text()}`);
 }
+// Notificaciones (APNs): el identificador necesita la función «Push Notifications»
+const bid = (await (await fetch(`${API}/bundleIds?filter[identifier]=${cfg.appId}`, { headers: H })).json()).data?.find((b) => b.attributes.identifier === cfg.appId);
+if (bid) {
+  const caps = await (await fetch(`${API}/bundleIds/${bid.id}/bundleIdCapabilities`, { headers: H })).json();
+  if (caps.data?.some((x) => x.attributes.capabilityType === 'PUSH_NOTIFICATIONS')) console.log('Notificaciones ya activadas en el identificador');
+  else {
+    const c = await fetch(`${API}/bundleIdCapabilities`, { method: 'POST', headers: H, body: JSON.stringify({ data: { type: 'bundleIdCapabilities', attributes: { capabilityType: 'PUSH_NOTIFICATIONS' }, relationships: { bundleId: { data: { type: 'bundleIds', id: bid.id } } } } }) });
+    console.log(c.ok ? 'Notificaciones activadas en el identificador' : `::warning::No se han podido activar las notificaciones: ${c.status} ${await c.text()}`);
+  }
+}
 const apps = await (await fetch(`${API}/apps?filter[bundleId]=${cfg.appId}`, { headers: H })).json();
 if (!apps.data?.length) {
   console.log(`::warning::Falta crear la app «${cfg.appName}» en App Store Connect (Apps → + → Nueva app, ID de paquete ${cfg.appId}). Sin eso no se puede subir a TestFlight.`);

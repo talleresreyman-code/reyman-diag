@@ -8,7 +8,7 @@ Es la misma App Reyman de https://app.talleresreyman.es, pero instalada como app
   - en Reyman Diag, «← App Reyman» vuelve con `reyman://`.
 - **Login**: cada app guarda su sesión. La primera vez se entra con el PIN en cada una.
 - **Permisos**: cámara, fotos y micrófono, para las fotos y vídeos de las OT y de la recepción.
-- **Notificaciones**: dentro de la app no funcionan las notificaciones web. Faltan las notificaciones nativas (siguiente paso).
+- **Notificaciones** (v1.1.0, 20/11/2026): en iPhone/iPad, notificaciones nativas (APNs) con `@capacitor/push-notifications`. `preparar-nativo.mjs` añade `App.entitlements` (aps-environment production), `CODE_SIGN_ENTITLEMENTS` y los dos métodos del `AppDelegate`; `registrar-bundle.mjs` activa «Push Notifications» en el identificador. La App Reyman pide el permiso, guarda el token y las envía con la clave APNs (.p8) que se sube en Ajustes. Android: pendiente (necesita un proyecto de Firebase).
 
 ## Cuándo hay que compilar la app
 Solo si cambia esta carpeta: permisos, plugins, icono o dirección del servidor.
