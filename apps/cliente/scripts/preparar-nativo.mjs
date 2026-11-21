@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const plataforma = process.argv[2];
+const ASSETS = path.join(DIR, 'assets'); // icono con la silueta y el nombre de Talleres Reyman
 
 if (plataforma === 'android') {
   const f = path.join(DIR, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
@@ -36,7 +37,16 @@ if (plataforma === 'android') {
         $2`);
   }
   fs.writeFileSync(f, x);
-  console.log(`AndroidManifest.xml: ${permisos.length} permisos añadidos`);
+  // Icono (normal, redondo y adaptativo con fondo azul Reyman)
+  const res = path.join(DIR, 'android', 'app', 'src', 'main', 'res');
+  for (const d of fs.readdirSync(path.join(ASSETS, 'android'))) {
+    fs.mkdirSync(path.join(res, d), { recursive: true });
+    for (const a of fs.readdirSync(path.join(ASSETS, 'android', d))) fs.copyFileSync(path.join(ASSETS, 'android', d, a), path.join(res, d, a));
+  }
+  const fondo = path.join(res, 'values', 'ic_launcher_background.xml');
+  fs.mkdirSync(path.dirname(fondo), { recursive: true });
+  fs.writeFileSync(fondo, '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#1D57A5</color>\n</resources>\n');
+  console.log(`AndroidManifest.xml: ${permisos.length} permisos añadidos · icono`);
 } else if (plataforma === 'ios') {
   const f = path.join(DIR, 'ios', 'App', 'App', 'Info.plist');
   let x = fs.readFileSync(f, 'utf8');
@@ -50,7 +60,13 @@ if (plataforma === 'android') {
   // Sin cifrado propio (solo HTTPS del sistema): así TestFlight no pregunta por la exportación en cada versión
   if (!x.includes('ITSAppUsesNonExemptEncryption')) x = x.replace(/<dict>/, '<dict>\n\t<key>ITSAppUsesNonExemptEncryption</key>\n\t<false/>');
   fs.writeFileSync(f, x);
-  console.log('Info.plist: permisos de Bluetooth y red local');
+  // Icono (1024 × 1024; iOS hace el resto de tamaños)
+  const set = path.join(DIR, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
+  fs.mkdirSync(set, { recursive: true });
+  for (const a of fs.readdirSync(set)) if (a.endsWith('.png')) fs.rmSync(path.join(set, a));
+  fs.copyFileSync(path.join(ASSETS, 'icono-1024.png'), path.join(set, 'AppIcon-1024.png'));
+  fs.writeFileSync(path.join(set, 'Contents.json'), JSON.stringify({ images: [{ filename: 'AppIcon-1024.png', idiom: 'universal', platform: 'ios', size: '1024x1024' }], info: { author: 'xcode', version: 1 } }, null, 2));
+  console.log('Info.plist: permisos de Bluetooth y red local · icono');
 } else {
   console.error('Uso: node scripts/preparar-nativo.mjs android|ios');
   process.exit(1);

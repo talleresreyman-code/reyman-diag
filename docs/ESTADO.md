@@ -184,6 +184,7 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
   - Presupuesto: coche y datos de la ficha o escritos a mano (como estaba).
   - Documentos: filtros en una fila deslizable («Todos los coches» / matrículas y «Todo» / Facturas, Presupuestos, Órdenes de reparación).
   - Diagnóstico: oferta «¿No tienes adaptador? Pídelo y recógelo en el taller» preparada pero **apagada** (`OFRECER_ADAPTADOR` en `vistas/diagnostico.js`) hasta que todo esté desarrollado.
+- **0.4.2 (21/11/2026):** icono propio de la app con la silueta del coche y «REYMAN» del logotipo sobre azul Reyman en degradado (`apps/cliente/assets/`: `icono.svg` original, `icono-1024.png` para iOS y `android/` normal, redondo y adaptativo con fondo #1D57A5; los copia `scripts/preparar-nativo.mjs`). Dentro de la app, los cinco motivos con iconos rellenos sobre fondos en degradado por color (azul, naranja, verde, morado, gris) y la pestaña activa resaltada.
 - Pendiente (con OK de José): que el asistente reconozca el formato de la app y deje la solicitud como cita pendiente en la App Reyman; API de clientes en la App Reyman (sustituye a n8n/GemiCar); notificaciones push.
 
 ### Pruebas

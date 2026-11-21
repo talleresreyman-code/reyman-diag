@@ -1,14 +1,13 @@
 // Reyman Connect · Inicio: qué pasa con mi coche, qué tengo pendiente y «¿qué necesitas?»
 
 import { st, TALLER, DEMO } from '../estado.js';
-import { esc, I, fmtFechaHora, nombreCorto, toast } from '../ui.js';
+import { esc, I, IM, fmtFechaHora, nombreCorto, toast } from '../ui.js';
 import { estadoCorto, abrir, urlPresupuesto } from '../cliente.js';
 import { TIPOS, ORDEN_TIPOS, pendientes, enTaller } from '../solicitudes.js';
 import { mantenimiento } from './diagnostico.js';
 import { abrirSolicitud } from './solicitud.js';
 import { enlazarPegar, urlPedirEnlace, refrescarSiViejo } from './bienvenida.js';
 
-const ICONO_TIPO = { mant: I.mant, averia: I.alerta, presupuesto: I.euro, consulta: I.charla, admin: I.factura };
 
 /** Coches que están físicamente en el taller ahora mismo (terminado primero). Si no hay ninguno, no se enseña nada. */
 export function cochesEnTaller() {
@@ -57,7 +56,7 @@ export function vInicio() {
       </div>`).join('')}</section>` : ''}
     <h2 class="titulo-sec">¿Qué necesitas?</h2>
     <section class="motivos">
-      ${ORDEN_TIPOS.map((t) => `<button class="motivo m-${t}" data-sol="${t}"><span class="m-icono">${ICONO_TIPO[t]}</span><span class="m-txt"><strong>${esc(TIPOS[t].titulo)}</strong><span class="peq">${esc(TIPOS[t].sub)}</span></span>${I.flecha}</button>`).join('')}
+      ${ORDEN_TIPOS.map((t) => `<button class="motivo m-${t}" data-sol="${t}"><span class="m-icono">${IM[t]}</span><span class="m-txt"><strong>${esc(TIPOS[t].titulo)}</strong><span class="peq">${esc(TIPOS[t].sub)}</span></span>${I.flecha}</button>`).join('')}
     </section>
     ${!d.cliente ? `<section class="panel">
       <p><strong>¿Ya eres cliente?</strong></p>

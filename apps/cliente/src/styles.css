@@ -160,12 +160,14 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .motivo { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 12px 14px; text-align: left; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--superficie); cursor: pointer; }
 .motivo:active { transform: scale(0.99); }
 .motivo > svg { width: 20px; height: 20px; color: var(--gris); flex: none; }
-.m-icono { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 12px; flex: none; background: var(--azul-fondo); color: var(--azul-hondo); }
-.m-icono svg { width: 26px; height: 26px; }
-.m-averia .m-icono { background: var(--rojo-fondo); color: var(--rojo); }
-.m-presupuesto .m-icono { background: var(--verde-fondo); color: var(--verde); }
-.m-consulta .m-icono { background: var(--amarillo-fondo); color: var(--amarillo); }
-.m-admin .m-icono { background: var(--fondo); color: var(--gris); }
+.m-icono { display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 15px; flex: none; color: #fff;
+  background: linear-gradient(145deg, #4a94e8, #1d57a5); box-shadow: 0 6px 14px -6px rgba(29, 87, 165, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.m-icono svg { width: 28px; height: 28px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18)); }
+.m-averia .m-icono { background: linear-gradient(145deg, #ff9a4d, #e0452b); box-shadow: 0 6px 14px -6px rgba(224, 69, 43, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.m-presupuesto .m-icono { background: linear-gradient(145deg, #45cf87, #15804a); box-shadow: 0 6px 14px -6px rgba(21, 128, 74, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.m-consulta .m-icono { background: linear-gradient(145deg, #9b80f5, #5a3fc4); box-shadow: 0 6px 14px -6px rgba(90, 63, 196, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.m-admin .m-icono { background: linear-gradient(145deg, #8d9bb0, #4b5a70); box-shadow: 0 6px 14px -6px rgba(75, 90, 112, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.motivo { transition: transform 0.1s ease, box-shadow 0.15s ease; box-shadow: 0 1px 2px rgba(20, 40, 70, 0.06); }
 .m-txt { flex: 1; display: flex; flex-direction: column; }
 .m-txt strong { font-family: var(--fuente-c); font-size: 1.15rem; line-height: 1.2; }
 .m-txt .peq { color: var(--gris); }
@@ -204,3 +206,6 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .foto-prev { display: flex; align-items: center; gap: 12px; }
 .foto-prev img { width: 96px; height: 72px; object-fit: cover; border-radius: 10px; border: 1px solid var(--linea); }
 .foto-btn { cursor: pointer; }
+/* Pestañas: la activa con fondo de color */
+.tabs svg { padding: 3px 14px; width: 52px; height: 30px; border-radius: 99px; transition: background 0.15s ease; }
+.tabs [aria-current='page'] svg { background: var(--azul-fondo); color: var(--azul-hondo); }
