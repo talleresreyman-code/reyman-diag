@@ -195,3 +195,12 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .enviado { text-align: center; padding: 24px 16px; }
 .ok-icono { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 2rem; display: flex; align-items: center; justify-content: center; }
 .enviado .previa { text-align: left; }
+.filtro { margin: 0 -12px 8px; padding: 2px 12px; overflow-x: auto; }
+.filtro .chips { flex-wrap: nowrap; }
+.filtro .chip { white-space: nowrap; }
+.prediag { border-left: 6px solid var(--azul); }
+.prediag.rojo { border-left-color: var(--rojo); } .prediag.ambar { border-left-color: var(--ambar); } .prediag.verde { border-left-color: var(--verde); }
+.prediag ul { margin: 0 0 8px; padding-left: 20px; }
+.foto-prev { display: flex; align-items: center; gap: 12px; }
+.foto-prev img { width: 96px; height: 72px; object-fit: cover; border-radius: 10px; border: 1px solid var(--linea); }
+.foto-btn { cursor: pointer; }

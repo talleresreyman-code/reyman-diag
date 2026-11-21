@@ -3,17 +3,17 @@
 import { st, TALLER, DEMO } from '../estado.js';
 import { esc, I, fmtFechaHora, nombreCorto, toast } from '../ui.js';
 import { estadoCorto, abrir, urlPresupuesto } from '../cliente.js';
-import { TIPOS, ORDEN_TIPOS, pendientes } from '../solicitudes.js';
+import { TIPOS, ORDEN_TIPOS, pendientes, enTaller } from '../solicitudes.js';
 import { mantenimiento } from './diagnostico.js';
 import { abrirSolicitud } from './solicitud.js';
 import { enlazarPegar, urlPedirEnlace, refrescarSiViejo } from './bienvenida.js';
 
 const ICONO_TIPO = { mant: I.mant, averia: I.alerta, presupuesto: I.euro, consulta: I.charla, admin: I.factura };
 
-/** Coche del cliente en el taller ahora mismo (terminado primero). */
+/** Coches que están físicamente en el taller ahora mismo (terminado primero). Si no hay ninguno, no se enseña nada. */
 export function cochesEnTaller() {
   const vs = st.datos.clienteDatos?.vehiculos || [];
-  return vs.filter((v) => v.estado).sort((a, b) => (b.estado.terminado ? 1 : 0) - (a.estado.terminado ? 1 : 0));
+  return vs.filter((v) => v.estado && enTaller(v)).sort((a, b) => (b.estado.terminado ? 1 : 0) - (a.estado.terminado ? 1 : 0));
 }
 
 export function tarjetaEstado(v) {

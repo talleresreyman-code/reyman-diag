@@ -122,3 +122,37 @@ test('Connect · fechas', () => {
   assert.equal(diasHasta('15/12/2026', new Date(2026, 10, 21, 23)), 24);
   assert.equal(diasHasta('', new Date()), null);
 });
+
+test('Connect · solo cuenta como «en el taller» si el coche está físicamente', async () => {
+  const { enTaller } = await import('../apps/cliente/src/solicitudes.js');
+  assert.equal(enTaller({ en_taller: true }), true);
+  assert.equal(enTaller({ estado: { texto: 'Terminado', en_taller: true } }), true);
+  assert.equal(enTaller({ estado: { texto: 'Presupuesto enviado, pendiente de tu respuesta', en_taller: false } }), false);
+  assert.equal(enTaller({}), false);
+});
+
+test('Connect · avería → prediagnóstico de Reyman Online con los datos de la ficha', async () => {
+  const { validarPrediagnostico, cuerpoReymanOnline, sintomaPrincipal } = await import('../apps/cliente/src/solicitudes.js');
+  const coches = cochesDisponibles(DATOS);
+  const s = nuevaSolicitud('averia', { coche: '1234KLM' });
+  s.sel = ['potencia', 'frenos']; s.pasa = ['frenar']; s.desde = 'hoy'; s.circular = 'dudas'; s.texto = 'Chirría';
+  assert.equal(sintomaPrincipal(s), 'Frenos');
+  assert.match(validarPrediagnostico(s, coches, { nombre: 'José', telefono: '91 871 11 64' }), /móvil válido/);
+  assert.match(validarPrediagnostico(s, coches, { nombre: 'José', telefono: '+34 605 659 940' }), /dos casillas/);
+  s.rgpd = true; s.acepto = true;
+  assert.equal(validarPrediagnostico(s, coches, { nombre: 'José', telefono: '+34 605 659 940' }), null);
+  const b = cuerpoReymanOnline(s, { coches, nombre: 'José', telefono: '+34 605 659 940', codigos: ['P0299'] });
+  assert.equal(b.telefono, '605659940');
+  assert.equal(b.matricula, '1234KLM');
+  assert.equal(b.marca, 'Seat');
+  assert.equal(b.modelo, 'León 1.5 Tsi');
+  assert.equal(b.km, '84320');
+  assert.equal(b.sintoma, 'Frenos');
+  assert.match(b.guiadas, /Pierde fuerza; Frena raro; Circulo, pero me preocupa/);
+  assert.equal(b.cuando, 'Al frenar');
+  assert.equal(b.codigos, 'P0299');
+  assert.equal(b.web, '');
+  assert.ok(b.rgpd && b.acepto);
+  s.pre = { ok: true, titulo: 'Desgaste de frenos', gravedad: 'rojo' };
+  assert.match(construirMensaje(s, { coches }), /Prediagnóstico Reyman Online: Desgaste de frenos \(no circular\)/);
+});

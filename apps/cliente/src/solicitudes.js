@@ -70,7 +70,7 @@ const nombres = (lista, ids) => (ids || []).map((id) => nombre(lista, id));
 /** Solicitud vacía de un tipo (con el coche elegido, si se sabe). */
 export function nuevaSolicitud(tipo, { coche = null, sel = [] } = {}) {
   return {
-    tipo, coche, otro: { marca: '', modelo: '', matricula: '', km: '' }, km: '',
+    tipo, coche, otro: { marca: '', modelo: '', matricula: '', km: '', anio: '' }, km: '',
     sel: [...sel], testigos: [], pasa: [], desde: null, circular: null, codigos: true,
     neumaticos: { medida: '', cantidad: '', gama: null },
     plazo: null, sobre: null, cuando: null, dia: '', espera: 'deja', sustitucion: false, texto: '',
@@ -85,7 +85,7 @@ export function cochesDisponibles(datos) {
     const m = limpiaMatricula(v.matricula);
     if (!m || vistos.has(m)) continue;
     vistos.add(m);
-    out.push({ id: m, matricula: m, nombre: [v.marca, v.modelo].filter(Boolean).join(' '), km: Number(v.km) > 0 ? Number(v.km) : null, origen: 'taller', itv: v.proxima_itv || v.itv_cliente || '', enTaller: !!v.en_taller });
+    out.push({ id: m, matricula: m, marca: v.marca || '', modelo: v.modelo || '', nombre: [v.marca, v.modelo].filter(Boolean).join(' '), km: Number(v.km) > 0 ? Number(v.km) : null, origen: 'taller', itv: v.proxima_itv || v.itv_cliente || '', enTaller: enTaller(v) });
   }
   const loc = datos?.vehiculo;
   const mLoc = limpiaMatricula(loc?.matricula);
@@ -94,6 +94,9 @@ export function cochesDisponibles(datos) {
   }
   return out;
 }
+
+/** El coche está físicamente en el taller (no basta con tener una OT abierta o un presupuesto). */
+export const enTaller = (v) => v?.en_taller === true || v?.estado?.en_taller === true;
 
 export function limpiaMatricula(m) { return String(m || '').replace(/[\s-]/g, '').toUpperCase(); }
 
@@ -135,11 +138,11 @@ const numero = (s) => { const n = Number(String(s ?? '').replace(/\D/g, '')); re
 export function cocheDe(sol, coches) {
   if (sol.coche === 'otro') {
     const o = sol.otro;
-    return { nombre: [o.marca, o.modelo].filter((x) => x && x.trim()).join(' ').trim(), matricula: limpiaMatricula(o.matricula), km: numero(o.km), otro: true };
+    return { nombre: [o.marca, o.modelo].filter((x) => x && x.trim()).join(' ').trim(), marca: (o.marca || '').trim(), modelo: (o.modelo || '').trim(), anio: String(o.anio || '').replace(/\D/g, '').slice(0, 4), matricula: limpiaMatricula(o.matricula), km: numero(o.km), otro: true };
   }
   const c = coches.find((x) => x.id === sol.coche);
   if (!c) return null;
-  return { nombre: c.nombre, matricula: c.matricula, km: numero(sol.km) || null, kmUltimo: c.km };
+  return { nombre: c.nombre, marca: c.marca || '', modelo: c.modelo || '', anio: '', matricula: c.matricula, km: numero(sol.km) || null, kmUltimo: c.km };
 }
 
 /** ¿Qué tipo de solicitud necesita coche? */
@@ -217,6 +220,7 @@ export function construirMensaje(sol, { coches = [], cliente = '', codigos = [],
     if (sol.desde) L.push(`📆 ${nombre(DESDE, sol.desde)}`);
     if (sol.circular) L.push(`${sol.circular === 'no' ? '⛔' : '🚦'} ${nombre(CIRCULAR, sol.circular)}`);
     if (sol.codigos && codigos.length) L.push(`📟 Códigos leídos con el adaptador: ${codigos.join(', ')}`);
+    if (sol.pre?.ok) L.push(`🤖 Prediagnóstico Reyman Online: ${sol.pre.titulo || 'hecho'} (${{ rojo: 'no circular', amarillo: 'revisar pronto', verde: 'sin urgencia' }[sol.pre.gravedad] || sol.pre.gravedad})`);
   }
 
   if (sol.tipo === 'presupuesto') {
@@ -276,4 +280,54 @@ export function pendientes(datos, { hoy = new Date(), revision = null } = {}) {
     out.push({ id: 'revision', color: revision.estado === 'vencida' ? 'rojo' : 'ambar', titulo: revision.estado === 'vencida' ? 'Te toca la revisión' : 'Se acerca la revisión', detalle: 'Según los km y la fecha de la última.', accion: { tipo: 'solicitud', sol: 'mant', coche: c?.id || null, sel: ['revision'] }, boton: 'Pedir cita' });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Reyman Online (prediagnóstico con IA de talleresreyman.com/que-le-pasa-a-mi-coche/) desde la app
+// Mismo servicio (n8n «Reyman Online · Prediagnóstico web», POST /webhook/reyman-online): el cliente recibe la
+// orientación y la urgencia, y al taller le llega la ficha técnica por correo y al panel, como desde la web.
+// ---------------------------------------------------------------------------
+export const RE_MOVIL = /^[67]\d{8}$/;
+export const limpiaMovil = (t) => { let x = String(t || '').replace(/\D/g, ''); if (x.length === 11 && x.startsWith('34')) x = x.slice(2); return x; };
+
+/** Síntoma principal para Reyman Online: los de riesgo primero (el servicio los trata como «no circular»). */
+export function sintomaPrincipal(sol) {
+  if (sol.sel.includes('frenos') || sol.testigos.includes('frenos')) return 'Frenos';
+  if (sol.sel.includes('direccion')) return 'Dirección';
+  if (sol.testigos.includes('temperatura')) return 'Temperatura';
+  const primero = sol.sel.find((x) => x !== 'otro');
+  return primero ? nombre(SINTOMAS, primero) : 'Otra cosa';
+}
+
+/** Qué falta para pedir el prediagnóstico (texto para el cliente) o null. */
+export function validarPrediagnostico(sol, coches, { nombre: n = '', telefono = '' } = {}) {
+  const e = validar(sol, coches);
+  if (e) return e;
+  const c = cocheDe(sol, coches);
+  if (!c?.matricula && !c?.marca && !c?.nombre) return 'Dinos la matrícula o la marca del coche.';
+  if (!String(n).trim()) return 'Escribe tu nombre.';
+  if (!RE_MOVIL.test(limpiaMovil(telefono))) return 'Escribe un móvil válido (9 cifras, empieza por 6 o 7).';
+  if (!sol.rgpd || !sol.acepto) return 'Marca las dos casillas para hacer el prediagnóstico.';
+  return null;
+}
+
+/** Cuerpo para el servicio Reyman Online (mismas claves que el formulario de la web). */
+export function cuerpoReymanOnline(sol, { coches = [], nombre: n = '', telefono = '', codigos = [], foto = null } = {}) {
+  const c = cocheDe(sol, coches) || {};
+  const marca = c.marca || (c.nombre || '').split(' ')[0] || '';
+  const modelo = c.modelo || (c.nombre || '').split(' ').slice(1).join(' ');
+  const guiadas = [
+    ...nombres(SINTOMAS, sol.sel),
+    ...(sol.sel.includes('testigo') && sol.testigos.length ? [`Testigo: ${nombres(TESTIGOS, sol.testigos).join(', ')}`] : []),
+    ...(sol.circular ? [nombre(CIRCULAR, sol.circular)] : []),
+  ].join('; ');
+  return {
+    nombre: String(n).trim(), telefono: limpiaMovil(telefono),
+    matricula: c.matricula || '', marca, modelo, motor: '', anio: c.anio || '', km: String(c.km || c.kmUltimo || ''),
+    sintoma: sintomaPrincipal(sol), guiadas, cuando: nombres(CUANDO_PASA, sol.pasa).join(', '), desde: sol.desde ? nombre(DESDE, sol.desde) : '',
+    descripcion: sol.texto.trim(),
+    codigos: sol.codigos && codigos.length ? codigos.join(' ') : '', origen_codigos: sol.codigos && codigos.length ? 'Lector OBD propio o app' : '',
+    ...(foto ? { foto } : {}),
+    contacto: 'Desde la app Reyman Connect', rgpd: !!sol.rgpd, acepto: !!sol.acepto, web: '', origen: 'reyman-connect',
+  };
 }

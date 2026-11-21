@@ -178,10 +178,16 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - **Mis coches:** cada coche con estado, ITV (verde/ámbar/rojo), última visita y botones Pedir cita · Le pasa algo · Documentos (n). **Documentos:** presupuestos por responder arriba y filtros por coche y por tipo (flotas).
 - Quitado el vínculo por código de taller y el envío a `/api/connect/avisos` (no llegaba a ninguna pantalla); el servidor no se toca.
 - Código separado: `estado.js`, `ui.js`, `solicitudes.js`, `vistas/` (inicio, coches, documentos, diagnostico, solicitud, bienvenida). Botón atrás de Android. Pruebas: `test/connect-solicitudes.test.js`.
+- **0.4.1 (21/11/2026, revisión de José):**
+  - El estado del coche (Inicio y Mis coches) solo sale si el coche está **físicamente en el taller** (`en_taller`); un presupuesto pendiente va en «pendientes».
+  - **Avería con Reyman Online integrado:** el mismo servicio que la web «¿Qué le pasa a mi coche?» (`POST /webhook/reyman-online`, flujo IdCrwTSojzZVb0XZ). Coche, km, nombre y móvil salen de la ficha (o los escribe el cliente; el móvil se recuerda), con foto opcional del cuadro (se reduce a JPEG), las dos casillas legales y el resultado en la app (semáforo, causas, consejo, diagnosis). Al taller le llega la ficha técnica por correo y al panel, como desde la web. Después, «Pedir cita por WhatsApp» con el prediagnóstico en el mensaje. Coste: el de Reyman Online (una llamada a la IA por consulta; límite del servicio, 3 consultas al día por móvil).
+  - Presupuesto: coche y datos de la ficha o escritos a mano (como estaba).
+  - Documentos: filtros en una fila deslizable («Todos los coches» / matrículas y «Todo» / Facturas, Presupuestos, Órdenes de reparación).
+  - Diagnóstico: oferta «¿No tienes adaptador? Pídelo y recógelo en el taller» preparada pero **apagada** (`OFRECER_ADAPTADOR` en `vistas/diagnostico.js`) hasta que todo esté desarrollado.
 - Pendiente (con OK de José): que el asistente reconozca el formato de la app y deje la solicitud como cita pendiente en la App Reyman; API de clientes en la App Reyman (sustituye a n8n/GemiCar); notificaciones push.
 
 ### Pruebas
-- **125 pruebas automáticas.**
+- **127 pruebas automáticas.**
 
 ## Pendiente
 

@@ -6,6 +6,9 @@ import { urlDocumento, urlPresupuesto, abrir } from '../cliente.js';
 import { limpiaMatricula } from '../solicitudes.js';
 import { enlazarPegar, urlPedirEnlace, refrescarCliente, refrescarSiViejo, quitarFicha } from './bienvenida.js';
 
+const PLURAL = { Factura: 'Facturas', Presupuesto: 'Presupuestos', 'Orden de reparación': 'Órdenes de reparación', Albarán: 'Albaranes' };
+const plural = (t) => PLURAL[t] || t;
+
 const fechaDoc = (s) => (s ? new Date(`${s}T12:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 
 export function vDocs() {
@@ -26,8 +29,8 @@ export function vDocs() {
       <div><span class="etq">Presupuesto por responder</span><strong>${esc(p.vehiculo || '')} <span class="matricula">${esc(p.matricula || '')}</span></strong><br><span class="peq suave">Nº ${esc(p.num || '')}</span></div>
       <button class="btn" data-presu="${esc(p.token)}">Ver y responder</button>
     </section>`).join('')}
-    ${mats.length > 1 ? `<p class="etq">Coche</p>${chips('f-mat', [['', 'Todos'], ...mats.map((m) => [m, m])], f.matricula || '')}` : ''}
-    ${tipos.length > 1 ? `<p class="etq" style="margin-top:8px">Tipo</p>${chips('f-tipo', [['', 'Todos'], ...tipos.map((t) => [t, t])], f.tipo || '')}` : ''}
+    ${mats.length > 1 ? `<div class="filtro">${chips('f-mat', [['', 'Todos los coches'], ...mats.map((m) => [m, m])], f.matricula || '')}</div>` : ''}
+    ${tipos.length > 1 ? `<div class="filtro">${chips('f-tipo', [['', 'Todo'], ...tipos.map((t) => [t, plural(t)])], f.tipo || '')}</div>` : ''}
     <section class="panel" style="margin-top:12px">
       ${docs.length ? docs.slice(0, 40).map((x) => `<button class="doc" data-doc="${esc(x.id)}"><span><strong>${esc(x.tipo)}</strong> · ${esc(x.nombre)}<br><span class="peq suave">${esc(fechaDoc(x.fecha))}${x.matriculas?.length ? ` · ${esc(x.matriculas.join(', '))}` : ''}</span></span><span class="enlace">PDF</span></button>`).join('') : '<p class="suave">No hay documentos con este filtro.</p>'}
       ${docs.length > 40 ? `<p class="peq suave">Y ${docs.length - 40} más: filtra por coche para verlos.</p>` : ''}

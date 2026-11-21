@@ -3,7 +3,7 @@
 import { st, ir } from '../estado.js';
 import { esc, I, fmtKm } from '../ui.js';
 import { estadoCorto } from '../cliente.js';
-import { cochesDisponibles, diasHasta, limpiaMatricula } from '../solicitudes.js';
+import { cochesDisponibles, diasHasta, limpiaMatricula, enTaller } from '../solicitudes.js';
 import { enlazarPegar, urlPedirEnlace, refrescarSiViejo } from './bienvenida.js';
 
 function itvTexto(itv) {
@@ -23,12 +23,13 @@ export function vCoches() {
     ${!vs.length && !app ? `<section class="panel vacio"><p>Aquí verás tus coches con su estado, la última visita y la ITV.</p>
       <div class="fila-btn col"><button class="btn" id="b-pegar">Pegar mi enlace de WhatsApp</button><a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedir mi enlace por WhatsApp</a></div></section>` : ''}
     ${vs.map((v) => {
-      const e = estadoCorto(v);
+      const dentro = enTaller(v);
+      const e = dentro ? estadoCorto(v) : null;
       const m = limpiaMatricula(v.matricula);
       const nDocs = docs.filter((x) => (x.matriculas || []).map(limpiaMatricula).includes(m)).length;
       return `<section class="panel vehiculo">
         <div class="coche-top"><div><strong class="v-nombre">${esc([v.marca, v.modelo].filter(Boolean).join(' '))}</strong><br><span class="matricula">${esc(v.matricula)}</span></div>
-          <div class="insignias">${v.en_taller ? '<span class="insignia ambar">En el taller</span>' : ''}${itvTexto(v.proxima_itv || v.itv_cliente)}</div></div>
+          <div class="insignias">${dentro ? '<span class="insignia ambar">En el taller</span>' : ''}${itvTexto(v.proxima_itv || v.itv_cliente)}</div></div>
         ${e ? `<div class="aviso ${e.color}" style="margin-top:10px"><strong>${esc(e.texto)}</strong>${e.extra ? `<br><span class="peq">${esc(e.extra)}</span>` : ''}${e.motivo ? `<br><span class="peq">${esc(e.motivo)}</span>` : ''}</div>` : ''}
         <p class="peq suave" style="margin-top:8px">${v.ultima_visita ? `Última visita: ${esc(v.ultima_visita)}${Number(v.km) > 0 ? ` · ${esc(fmtKm(Number(v.km)))}` : ''}` : 'Sin visitas registradas'}${v.ultimo_trabajo ? `<br>${esc(v.ultimo_trabajo)}` : ''}</p>
         <div class="fila-btn tres">

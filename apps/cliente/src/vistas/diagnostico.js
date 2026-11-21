@@ -395,6 +395,16 @@ function ficha(vista, titulo, [color, valor, detalle]) {
   return `<button class="ficha ${color}" data-ir="${vista}"><span class="etq">${esc(titulo)}</span><strong>${esc(valor)}</strong><span class="peq">${esc(detalle)}</span></button>`;
 }
 
+// Ofrecer el adaptador a quien no lo tiene: se pide aquí, se recoge en el taller y le ayudamos a configurarlo.
+// Apagado hasta que todo esté desarrollado (decisión de José, 21/11/2026).
+export const OFRECER_ADAPTADOR = false;
+
+function bloqueAdaptador() {
+  if (!OFRECER_ADAPTADOR || st.datos.lecturas.length || st.sesion) return '';
+  return `<section class="panel"><h2>¿No tienes adaptador?</h2><p class="peq suave">Pídelo aquí y recógelo en el taller: te lo dejamos configurado en tu móvil.</p>
+    <button class="btn sec ancho" data-sol="consulta" data-sel="adaptador">${I.wa} Quiero el adaptador</button></section>`;
+}
+
 export function vDiag() {
   const d = st.datos;
   const l = ultimaLectura();
@@ -426,6 +436,7 @@ export function vDiag() {
       ${st.sesion ? '<button class="enlace centrado" id="desconectar">Desconectar el adaptador</button>' : ''}
       ${!DEMO ? `<p class="peq suave centrado">Adaptador: ${esc(textoConexion())} · <button class="enlace" id="adaptador">Cambiar</button></p>` : ''}
     </section>
+    ${bloqueAdaptador()}
     ${bloqueOcupado()}
     <section class="fichas">
       ${ficha('averias', 'Averías', fichaAv)}

@@ -97,7 +97,7 @@ const DATOS_DEMO = {
   ok: true, cliente: 'José (demostración)', prueba: true, actualizado: new Date().toISOString(),
   vehiculos: [
     { matricula: '1234KLM', marca: 'Seat', modelo: 'León 1.5 Tsi', km: '84320', ultima_visita: '12/02/2026', visitas: 6, ultimo_trabajo: 'Revisión anual', estado: { texto: 'Terminado: puedes pasar a recogerlo', extra: '', terminado: true, en_taller: true, motivo: 'Revisión anual · Cambio de escobillas', entrada: '13 de noviembre' }, en_taller: true, proxima_itv: '15/12/2026', itv_cliente: '' },
-    { matricula: '5678BCD', marca: 'Volkswagen', modelo: 'Golf 2.0 Tdi', km: '152300', ultima_visita: '03/10/2025', visitas: 9, ultimo_trabajo: 'Pastillas de freno delanteras', estado: null, en_taller: false, proxima_itv: '', itv_cliente: '' },
+    { matricula: '5678BCD', marca: 'Volkswagen', modelo: 'Golf 2.0 Tdi', km: '152300', ultima_visita: '03/10/2025', visitas: 9, ultimo_trabajo: 'Pastillas de freno delanteras', estado: { texto: 'Presupuesto enviado, pendiente de tu respuesta', en_taller: false }, en_taller: false, proxima_itv: '', itv_cliente: '' },
   ],
   documentos: [
     { id: 'demo1', nombre: 'FACT 26 1842', tipo: 'Factura', fecha: '2026-02-12', matriculas: ['1234KLM'] },
@@ -112,4 +112,41 @@ export async function alBotonAtras(volver) {
   await plugins();
   if (!app) return;
   try { app.addListener('backButton', () => { if (!volver()) app.exitApp(); }); } catch { /* */ }
+}
+
+/** Prediagnóstico de Reyman Online (el mismo servicio que la web «¿Qué le pasa a mi coche?»). Tarda unos 20 s. */
+export async function prediagnostico(cuerpo, { demo = false } = {}) {
+  if (demo) {
+    await new Promise((r) => setTimeout(r, 1500));
+    return { ok: true, gravedad: 'amarillo', aviso: null, titulo: 'Posible problema en la sobrealimentación', explicacion: 'Por lo que cuentas, el coche pierde fuerza al acelerar y el testigo de motor está encendido. Suele apuntar al turbo o a algo que le afecta.', causas: ['Fuga en un manguito del turbo', 'Fallo de la válvula de control del turbo', 'Filtro de partículas obstruido'], consejo: 'Evita acelerones fuertes hasta traerlo.', precio: null, diagnosis: 'Para confirmar la avería hace falta una diagnosis: aproximadamente 1 hora, en torno a 60 € con IVA.', legal: 'Prediagnóstico orientativo y no vinculante, hecho con inteligencia artificial. El presupuesto en firme se hace en el taller tras revisar el vehículo.' };
+  }
+  await plugins();
+  const url = `${N8N}/reyman-online`;
+  let j;
+  try {
+    if (http) { const r = await http.post({ url, headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, data: cuerpo, connectTimeout: 20000, readTimeout: 90000 }); j = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; }
+    else j = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })).json();
+  } catch {
+    throw new Error('No se ha podido hacer el prediagnóstico. Revisa la conexión a internet o escríbenos por WhatsApp.');
+  }
+  if (!j?.ok) throw new Error(j?.error || 'No se ha podido hacer el prediagnóstico. Escríbenos por WhatsApp.');
+  return j;
+}
+
+/** Foto (archivo del móvil) reducida a JPEG en base64 para enviarla (el servicio admite hasta 2 MB). */
+export function fotoReducida(archivo, lado = 1280) {
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    const u = URL.createObjectURL(archivo);
+    img.onload = () => {
+      const k = Math.min(1, lado / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(u);
+      ok(c.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(u); mal(new Error('No se ha podido leer la foto.')); };
+    img.src = u;
+  });
 }

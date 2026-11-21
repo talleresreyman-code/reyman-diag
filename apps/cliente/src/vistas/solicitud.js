@@ -6,7 +6,9 @@ import { $, esc, I, toast, abrirFuera, chips } from '../ui.js';
 import {
   TIPOS, MANT, GAMAS, SINTOMAS, TESTIGOS, CUANDO_PASA, DESDE, CIRCULAR, PRESUPUESTO, PLAZO, SOBRE, ADMIN, CUANDO, ESPERA,
   nuevaSolicitud, cochesDisponibles, validar, construirMensaje, urlWhatsApp, pideCita, necesitaCoche, resumen, referencia,
+  validarPrediagnostico, cuerpoReymanOnline, limpiaMovil,
 } from '../solicitudes.js';
+import { prediagnostico, fotoReducida, abrir } from '../cliente.js';
 import { codigosRecientes } from './diagnostico.js';
 
 /** Abre el formulario de un motivo (con el coche y las opciones ya marcadas, si se saben). */
@@ -15,6 +17,7 @@ export function abrirSolicitud(tipo, { coche = null, sel = [] } = {}) {
   const c = coche && coches.some((x) => x.id === coche) ? coche : coches.length === 1 ? coches[0].id : null;
   st.sol = nuevaSolicitud(tipo, { coche: c, sel });
   if (tipo === 'averia') st.sol.codigosAdaptador = codigosRecientes();
+  if (tipo === 'consulta' && sel.includes('adaptador')) { st.sol.sel = []; st.sol.sobre = 'general'; st.sol.texto = 'Quiero el adaptador OBD para usarlo con Reyman Connect. ¿Cuándo puedo pasar a recogerlo?'; }
   ir('solicitud');
 }
 
@@ -62,6 +65,7 @@ function seleccionCoche(s, coches, conOtro) {
       <label class="campo"><span>Modelo</span><input data-campo="otro.modelo" value="${esc(s.otro.modelo)}" autocapitalize="words" placeholder="León 1.5 TSI"></label>
       <label class="campo"><span>Matrícula</span><input data-campo="otro.matricula" value="${esc(s.otro.matricula)}" autocapitalize="characters" maxlength="10" placeholder="1234ABC"></label>
       <label class="campo"><span>Km actuales${kmObligatorio ? '' : ' (si los sabes)'}</span><input data-campo="otro.km" value="${esc(s.otro.km)}" inputmode="numeric"></label>
+      ${s.tipo === 'averia' ? `<label class="campo"><span>Año (si lo sabes)</span><input data-campo="otro.anio" value="${esc(s.otro.anio)}" inputmode="numeric" maxlength="4"></label>` : ''}
     </div>` : ''}
     ${s.coche && s.coche !== 'otro' ? `<label class="campo"><span>Km actuales${kmObligatorio ? '' : ' (si los sabes)'}</span><input data-campo="km" value="${esc(s.km)}" inputmode="numeric" placeholder="${c?.km ? `En la última visita: ${c.km.toLocaleString('es-ES')}` : ''}"></label>` : ''}
   </section>`;
@@ -111,6 +115,42 @@ function bloqueCuando(s) {
   </section>`;
 }
 
+const SEMAFORO = { rojo: ['rojo', 'No circules'], amarillo: ['ambar', 'Revísalo pronto'], verde: ['verde', 'Sin urgencia'] };
+
+/** Prediagnóstico gratis con Reyman Online, con los datos del cliente y del coche ya puestos. */
+function bloquePrediagnostico(s) {
+  const c = st.datos.contacto || {};
+  if (s.pre) {
+    const p = s.pre;
+    const [color, txt] = SEMAFORO[p.gravedad] || ['azul', ''];
+    return `<section class="panel prediag ${color}">
+      <p class="etq">Prediagnóstico Reyman Online</p>
+      ${p.fuera_de_ambito ? '' : `<span class="insignia ${color}">${esc(txt)}</span>`}
+      ${p.aviso ? `<div class="aviso rojo" style="margin-top:10px"><strong>${esc(p.aviso)}</strong></div><a class="btn ancho" style="margin-top:10px" href="tel:${esc(TALLER.telefono.replace(/\s/g, ''))}">${I.tel} Llamar al taller</a>` : ''}
+      ${p.titulo ? `<h2 style="margin-top:10px">${esc(p.titulo)}</h2>` : ''}
+      ${p.explicacion ? `<p>${esc(p.explicacion)}</p>` : ''}
+      ${p.causas?.length ? `<p class="peq"><strong>Causas más habituales</strong></p><ul class="peq">${p.causas.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${p.consejo ? `<p class="peq"><strong>Mientras tanto:</strong> ${esc(p.consejo)}</p>` : ''}
+      ${p.precio ? `<p class="peq"><strong>${esc(p.precio)}</strong></p>` : ''}
+      ${p.diagnosis ? `<p class="peq">${esc(p.diagnosis)}</p>` : ''}
+      ${p.legal ? `<p class="peq suave">${esc(p.legal)}</p>` : ''}
+      <p class="peq">¿Lo traes? Elige el día y pide cita aquí abajo.</p>
+    </section>`;
+  }
+  return `<section class="panel prediag">
+    <h2>¿Qué puede ser? · Prediagnóstico gratis</h2>
+    <p class="peq suave">Te orientamos sobre la avería y lo urgente que es en unos 20 segundos. Lo hace Reyman Online, nuestra IA, y nos llega también al taller.</p>
+    <div class="dos">
+      <label class="campo"><span>Tu nombre</span><input data-campo="contacto.nombre" autocomplete="name" value="${esc(c.nombre || '')}"></label>
+      <label class="campo"><span>Tu móvil</span><input data-campo="contacto.telefono" type="tel" autocomplete="tel" inputmode="tel" value="${esc(c.telefono || '')}"></label>
+    </div>
+    <label class="check"><input type="checkbox" data-campo="rgpd" ${s.rgpd ? 'checked' : ''}> <span class="peq">He leído y acepto la <button type="button" class="enlace" id="ver-privacidad">política de privacidad</button>. Talleres Reyman usa estos datos solo para atender tu consulta.</span></label>
+    <label class="check"><input type="checkbox" data-campo="acepto" ${s.acepto ? 'checked' : ''}> <span class="peq">Entiendo que es un prediagnóstico orientativo hecho con inteligencia artificial: el presupuesto en firme se hace en el taller.</span></label>
+    <div id="pre-error" role="alert"></div>
+    ${s.cargandoPre ? '<div class="progreso" role="status"><span class="giro"></span>Analizando tu consulta… (unos 20 segundos)</div>' : '<button class="btn ancho" id="pre-pedir">Ver qué puede ser</button>'}
+  </section>`;
+}
+
 export function vSolicitud() {
   const s = st.sol;
   if (!s) return '';
@@ -124,14 +164,17 @@ export function vSolicitud() {
     ${bloqueCoche(s, coches)}
     ${bloqueTipo(s)}
     ${codigos.length ? `<label class="check panel"><input type="checkbox" data-campo="codigos" ${s.codigos ? 'checked' : ''}> <span>Enviar también los códigos que ha leído el adaptador: <strong>${esc(codigos.join(', '))}</strong></span></label>` : ''}
-    ${bloqueCuando(s)}
     <section class="panel">
-      ${pideNombre ? `<label class="campo"><span>Tu nombre</span><input data-campo="nombre" autocomplete="name" value="${esc(s.nombre || '')}"></label>` : ''}
+      ${pideNombre && s.tipo !== 'averia' ? `<label class="campo"><span>Tu nombre</span><input data-campo="nombre" autocomplete="name" value="${esc(s.nombre || '')}"></label>` : ''}
       <label class="campo"><span>${esc(NOTAS[s.tipo])}</span><textarea data-campo="texto" rows="3" maxlength="1000">${esc(s.texto)}</textarea></label>
-      ${s.tipo === 'averia' ? '<p class="peq suave">En WhatsApp puedes añadir una foto del testigo, un vídeo o una nota de voz con el ruido: nos ayuda mucho.</p><p class="peq suave">La diagnosis con máquina tiene coste (orientativo, de 50 a 60 €). Te lo confirmamos antes de hacer nada.</p>' : ''}
+      ${s.tipo === 'averia' ? `<p class="etq" style="margin-top:6px">Foto del cuadro o de la avería (opcional)</p>
+        ${s.foto ? `<div class="foto-prev"><img src="${esc(s.foto)}" alt="Foto adjunta"><button type="button" class="enlace" id="foto-quitar">Quitar</button></div>` : '<label class="btn fantasma ancho foto-btn"><input type="file" accept="image/*" capture="environment" id="foto" hidden> Hacer o subir una foto</label>'}` : ''}
     </section>
+    ${s.tipo === 'averia' ? bloquePrediagnostico(s) : ''}
+    ${bloqueCuando(s)}
+    ${s.tipo === 'averia' ? '<p class="peq suave">En WhatsApp puedes añadir un vídeo o una nota de voz con el ruido: nos ayuda mucho. La diagnosis con máquina tiene coste (orientativo, unos 60 €) y te lo confirmamos antes de hacer nada.</p>' : ''}
     <div id="sol-error" role="alert"></div>
-    <button class="btn grande wa" id="sol-enviar">${I.wa} Enviar por WhatsApp</button>
+    <button class="btn grande wa" id="sol-enviar">${I.wa} ${s.tipo === 'averia' || s.tipo === 'mant' ? 'Pedir cita por WhatsApp' : 'Enviar por WhatsApp'}</button>
     <p class="peq suave centrado" style="margin-top:8px">Se abre WhatsApp con el mensaje escrito. Solo tienes que pulsar «Enviar».</p>
     ${DEMO ? '<details class="peq"><summary>Ver el mensaje</summary><pre class="previa" id="sol-previa"></pre></details>' : ''}`;
 }
@@ -197,9 +240,31 @@ export function eSolicitud(el) {
   el.querySelectorAll('[data-campo]').forEach((i) => {
     const ev = i.type === 'checkbox' || i.type === 'date' ? 'change' : 'input';
     i.addEventListener(ev, () => {
-      poner(s, i.dataset.campo, i.type === 'checkbox' ? i.checked : i.value);
+      const ruta = i.dataset.campo;
+      if (ruta.startsWith('contacto.')) { st.datos.contacto = { ...(st.datos.contacto || {}), [ruta.slice(9)]: i.value }; persistir(); } else poner(s, ruta, i.type === 'checkbox' ? i.checked : i.value);
       if (i.dataset.repintar) pintar(); else previa();
     });
+  });
+  $('#ver-privacidad', el)?.addEventListener('click', () => abrir('https://talleresreyman.com/politica-de-privacidad'));
+  $('#foto', el)?.addEventListener('change', async (e) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try { s.foto = await fotoReducida(f); pintar(); } catch (err) { toast(err.message); }
+  });
+  $('#foto-quitar', el)?.addEventListener('click', () => { s.foto = null; pintar(); });
+  $('#pre-pedir', el)?.addEventListener('click', async () => {
+    const coches = cochesDisponibles(st.datos);
+    const c = st.datos.contacto || {};
+    const err = validarPrediagnostico(s, coches, c);
+    if (err) { const caja = $('#pre-error', el); caja.innerHTML = `<div class="aviso rojo" style="margin-bottom:10px">${esc(err)}</div>`; caja.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    st.datos.contacto = { ...c, telefono: limpiaMovil(c.telefono) };
+    await persistir();
+    s.cargandoPre = true; pintar();
+    try {
+      s.pre = await prediagnostico(cuerpoReymanOnline(s, { coches, nombre: c.nombre, telefono: c.telefono, codigos: s.codigosAdaptador || [], foto: s.foto }), { demo: DEMO });
+    } catch (e2) { toast(e2.message); }
+    s.cargandoPre = false; pintar();
+    $('.prediag', document)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   $('#sol-enviar', el)?.addEventListener('click', async () => {
     const coches = cochesDisponibles(st.datos);
