@@ -106,3 +106,10 @@ const DATOS_DEMO = {
   ],
   presupuestos: [{ token: 'demo', num: '26/0915', matricula: '5678BCD', vehiculo: 'Volkswagen Golf', estado: 'enviado' }],
 };
+
+/** Botón «atrás» de Android: vuelve a la pantalla anterior; si no hay, deja que el sistema salga de la app. */
+export async function alBotonAtras(volver) {
+  await plugins();
+  if (!app) return;
+  try { app.addListener('backButton', () => { if (!volver()) app.exitApp(); }); } catch { /* */ }
+}

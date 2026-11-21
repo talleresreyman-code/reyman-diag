@@ -18,6 +18,8 @@ export const DATOS_INICIALES = {
   cliente: null, // ficha en el taller: { token (enlace personal de Mi taller), nombre, desde }
   clienteDatos: null, // última copia de Mi taller (vehículos, estado, documentos, presupuestos) para verla sin conexión
   bienvenidaVista: false, // ya ha pasado por la pantalla de bienvenida
+  contacto: null, // { nombre } para firmar los mensajes de WhatsApp
+  solicitudes: [], // últimas peticiones enviadas al taller { fecha, tipo, resumen, ref } (solo en el móvil)
 };
 
 let memoria = null;

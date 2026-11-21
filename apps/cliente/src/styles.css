@@ -122,7 +122,7 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .dlg { padding: 20px; }
 .dlg ul { padding-left: 20px; }
 
-.tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--superficie); border-top: 1px solid var(--linea); padding: 0 var(--sa-r) var(--sa-b) var(--sa-l); }
+.tabs { position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); background: var(--superficie); border-top: 1px solid var(--linea); padding: 0 var(--sa-r) var(--sa-b) var(--sa-l); }
 .tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px 10px; border: 0; background: none; color: var(--gris); font-size: 0.72rem; font-weight: 600; cursor: pointer; min-height: 60px; }
 .tabs svg { width: 24px; height: 24px; }
 .tabs [aria-current='page'] { color: var(--azul); }
@@ -142,3 +142,56 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .presu { border-left: 6px solid var(--ambar); }
 .doc { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 0; border: 0; border-bottom: 1px solid var(--linea); background: none; cursor: pointer; }
 .doc:last-of-type { border-bottom: 0; }
+
+/* 0.4 · App pensada desde lo que necesita el cliente */
+.ancho { width: 100%; }
+.cab .atras { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: 10px; background: var(--azul-fondo); color: var(--azul-hondo); cursor: pointer; }
+.cab .atras svg { width: 22px; height: 22px; }
+.saludo { margin: 6px 0 12px; }
+.titulo-sec { margin: 18px 0 8px; }
+.insignia.verde { background: var(--verde-fondo); color: var(--verde); }
+.insignias { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.v-nombre { font-family: var(--fuente-c); font-size: 1.15rem; }
+.aviso-taller .etq { margin-bottom: 2px; }
+.aviso-taller strong { font-size: 1.1rem; }
+
+/* «¿Qué necesitas?»: los cinco motivos */
+.motivos { display: grid; gap: 10px; margin-bottom: 14px; }
+.motivo { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 72px; padding: 12px 14px; text-align: left; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--superficie); cursor: pointer; }
+.motivo:active { transform: scale(0.99); }
+.motivo > svg { width: 20px; height: 20px; color: var(--gris); flex: none; }
+.m-icono { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 12px; flex: none; background: var(--azul-fondo); color: var(--azul-hondo); }
+.m-icono svg { width: 26px; height: 26px; }
+.m-averia .m-icono { background: var(--rojo-fondo); color: var(--rojo); }
+.m-presupuesto .m-icono { background: var(--verde-fondo); color: var(--verde); }
+.m-consulta .m-icono { background: var(--amarillo-fondo); color: var(--amarillo); }
+.m-admin .m-icono { background: var(--fondo); color: var(--gris); }
+.m-txt { flex: 1; display: flex; flex-direction: column; }
+.m-txt strong { font-family: var(--fuente-c); font-size: 1.15rem; line-height: 1.2; }
+.m-txt .peq { color: var(--gris); }
+
+/* Pendientes */
+.pendientes { display: grid; gap: 10px; margin-bottom: 4px; }
+.pendiente { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0; border-left: 6px solid var(--azul); }
+.pendiente.ambar { border-left-color: var(--ambar); } .pendiente.rojo { border-left-color: var(--rojo); }
+.pendiente .btn { flex: none; min-height: 42px; padding: 8px 14px; }
+@media (max-width: 380px) { .pendiente { flex-direction: column; align-items: stretch; } }
+.lista-sol { list-style: none; margin: 4px 0 0; padding: 0; }
+.lista-sol li { display: flex; flex-direction: column; padding: 8px 0; border-bottom: 1px solid var(--linea); }
+.lista-sol li:last-child { border-bottom: 0; }
+.fila-btn.tres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fila-btn.tres .btn { padding: 8px 6px; font-size: 0.9rem; min-height: 46px; }
+@media (max-width: 360px) { .fila-btn.tres { grid-template-columns: 1fr; } }
+
+/* Formulario de solicitud: botones de elección en vez de escribir */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 44px; padding: 8px 14px; border-radius: 99px; border: 1.5px solid var(--linea); background: var(--superficie); font-weight: 600; cursor: pointer; text-align: left; }
+.chip[aria-pressed='true'] { background: var(--azul); border-color: var(--azul); color: #fff; }
+.chip[aria-pressed='true']::before { content: '✓ '; }
+.sub-bloque { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--linea); }
+.sub-bloque .peq { margin: 10px 0 6px; }
+.btn.wa { background: #1e8a4c; }
+.previa { white-space: pre-wrap; font: 0.85rem/1.4 ui-monospace, Menlo, monospace; background: var(--fondo); padding: 10px; border-radius: 10px; }
+.enviado { text-align: center; padding: 24px 16px; }
+.ok-icono { width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 50%; background: var(--verde); color: #fff; font-size: 2rem; display: flex; align-items: center; justify-content: center; }
+.enviado .previa { text-align: left; }

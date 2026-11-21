@@ -1,4 +1,4 @@
-# Reyman Diag · Reyman Connect · estado (17/11/2026, v0.4.15)
+# Reyman Diag · Reyman Connect · estado (21/11/2026, v0.4.15 · Connect 0.4.0)
 
 Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba disponible: la conexión Wi-Fi se ha rehecho a partir del programa de enlace).
 
@@ -169,8 +169,19 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - **Reyman Diag** lee la OT pedida de la dirección (`?ot=&mat=&vin=`, también en la web) o del enlace (`@capacitor/app`, añadido a `lib/nativo.js`), enseña una cinta «Desde la App Reyman: OT … · matrícula» y, al leer el coche, propone esa OT para guardar la lectura. Hay que recompilar la app Diag (esquema `reymandiag` y plugin App).
 - Pendiente: notificaciones nativas en la app «Reyman» (dentro de la app no funcionan las notificaciones web).
 
+### 24. Reyman Connect 0.4: la app pensada desde lo que necesita el cliente (21/11/2026)
+- **Objetivo** (José): facilitar la comunicación con el cliente sin quitarle WhatsApp, y que al taller le llegue todo ordenado (citas, organización, ventas, fidelización).
+- **Pestañas nuevas:** Inicio · Mis coches · Documentos · Diagnóstico (lo del adaptador pasa a ser opcional, en una sola pestaña).
+- **Inicio:** estado del coche en el taller, **pendientes con su botón** (presupuesto por responder, ITV a menos de 45 días → «Pedir cita» con pre-ITV e ITV marcadas, revisión que toca) y **«¿Qué necesitas?»** con los cinco motivos: Mantenimiento, Le pasa algo al coche, Pedir presupuesto, Consulta técnica, Facturas y pagos. Debajo, lo último que ha pedido y la ficha del taller (WhatsApp, llamar, cómo llegar).
+- **Formulario por motivo** (`vistas/solicitud.js`, lógica en `solicitudes.js`): una pantalla con botones en vez de escribir (coche, qué necesita, síntomas y testigo, cuándo pasa, si puede circular, día que le viene bien, deja el coche o espera, coche de sustitución). Avisos: grúa (hablar antes con el taller), testigo rojo (parar), coste orientativo de la diagnosis, neumáticos para el día siguiente, sábados y domingos cerrado. Presupuesto exige marca, modelo, matrícula y km.
+- **Envío por WhatsApp:** abre WhatsApp al 665 942 470 con el mensaje ya escrito y ordenado (emojis por apartado y referencia `RC-AAMMDD-HHMM`); el cliente pulsa Enviar y puede añadir fotos, vídeo o nota de voz. Lo recibe el asistente IA REYMAN. Sin servidor nuevo, sin coste. Si WhatsApp no se abre: copiar el mensaje o llamar.
+- **Mis coches:** cada coche con estado, ITV (verde/ámbar/rojo), última visita y botones Pedir cita · Le pasa algo · Documentos (n). **Documentos:** presupuestos por responder arriba y filtros por coche y por tipo (flotas).
+- Quitado el vínculo por código de taller y el envío a `/api/connect/avisos` (no llegaba a ninguna pantalla); el servidor no se toca.
+- Código separado: `estado.js`, `ui.js`, `solicitudes.js`, `vistas/` (inicio, coches, documentos, diagnostico, solicitud, bienvenida). Botón atrás de Android. Pruebas: `test/connect-solicitudes.test.js`.
+- Pendiente (con OK de José): que el asistente reconozca el formato de la app y deje la solicitud como cita pendiente en la App Reyman; API de clientes en la App Reyman (sustituye a n8n/GemiCar); notificaciones push.
+
 ### Pruebas
-- **121 pruebas automáticas.**
+- **125 pruebas automáticas.**
 
 ## Pendiente
 

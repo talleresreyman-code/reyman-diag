@@ -2,7 +2,11 @@
 
 App para particulares (iPhone y Android) que se conecta al coche con un adaptador OBD Bluetooth LE. Gratis, sin cuenta y sin suscripción: los datos se quedan en el móvil y solo se envían al taller si el cliente lo vincula y lo acepta.
 
-## Qué hace (versión 0.1)
+## Qué hace (versión 0.4)
+
+Pensada desde por qué contacta un cliente con el taller. Pestañas: **Inicio** (estado del coche en el taller, pendientes y «¿Qué necesitas?» con los cinco motivos: mantenimiento, avería, presupuesto, consulta técnica, facturas y pagos), **Mis coches**, **Documentos** y **Diagnóstico** (adaptador, opcional). Cada motivo es un formulario de botones que abre WhatsApp con el mensaje ya escrito (`src/solicitudes.js`, `src/vistas/solicitud.js`).
+
+## Diagnóstico con el adaptador (versión 0.1, ahora en la pestaña Diagnóstico)
 
 | Pantalla | Qué enseña |
 |---|---|
