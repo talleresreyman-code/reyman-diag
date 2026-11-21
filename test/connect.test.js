@@ -62,37 +62,15 @@ const aviso = (extra = {}) => ({
   consentimiento: { aceptado: true, version: '2026-11', fecha: '2026-11-07T19:00:00Z' }, ...extra,
 });
 
-test('Ficha pública del taller por código', async () => {
-  const r = await app.inject({ url: '/api/connect/talleres/reyman' });
-  assert.equal(r.statusCode, 200);
-  assert.equal(r.json().taller.nombre, 'Talleres Reyman');
-  assert.equal(r.json().taller.tenant, undefined);
-  assert.equal((await app.inject({ url: '/api/connect/talleres/NOEXISTE' })).statusCode, 404);
+test('Connect: las rutas públicas antiguas ya no existen y exigen sesión', async () => {
+  for (const [method, url] of [['GET', '/api/connect/talleres/reyman'], ['POST', '/api/connect/avisos']]) {
+    const r = await app.inject({ method, url, payload: method === 'POST' ? aviso() : undefined });
+    assert.ok([401, 403, 404].includes(r.statusCode), `${url} da ${r.statusCode}`);
+  }
 });
 
-test('Aviso de estado: sin sesión, con consentimiento, datos limpios y CORS para la app', async () => {
-  const r = await app.inject({ method: 'POST', url: '/api/connect/avisos', headers: { origin: 'capacitor://localhost' }, payload: aviso() });
-  assert.equal(r.statusCode, 200);
-  assert.equal(r.headers['access-control-allow-origin'], 'capacitor://localhost');
-  const guardado = store._db.connect.at(-1);
-  assert.equal(guardado.tenant_id, 'reyman');
-  assert.equal(guardado.matricula, '1234ABC');
-  assert.deepEqual(guardado.averias.map((a) => a.codigo), ['P0401']);
-  // Un origen desconocido no recibe cabeceras CORS
-  const r2 = await app.inject({ method: 'POST', url: '/api/connect/avisos', headers: { origin: 'https://malo.example' }, payload: aviso() });
-  assert.equal(r2.headers['access-control-allow-origin'], undefined);
-});
-
-test('Sin consentimiento o cita sin teléfono: rechazado', async () => {
-  const sin = await app.inject({ method: 'POST', url: '/api/connect/avisos', payload: aviso({ consentimiento: { aceptado: false } }) });
-  assert.equal(sin.statusCode, 400);
-  const cita = await app.inject({ method: 'POST', url: '/api/connect/avisos', payload: aviso({ tipo: 'cita', contacto: { nombre: 'Ana' } }) });
-  assert.equal(cita.statusCode, 400);
-  const ok = await app.inject({ method: 'POST', url: '/api/connect/avisos', payload: aviso({ tipo: 'cita', contacto: { nombre: 'Ana', telefono: '600000000' }, mensaje: 'Me sale el testigo' }) });
-  assert.equal(ok.statusCode, 200);
-});
-
-test('La oficina ve y atiende los avisos con su sesión; sin acceso no', async () => {
+test('La oficina ve y atiende los avisos antiguos con su sesión; sin acceso no', async () => {
+  await store.crearAvisoConnect('reyman', { codigo_taller: 'reyman', tipo: 'estado', matricula: '1234ABC', averias: [], consentimiento: { aceptado: true } });
   assert.equal((await app.inject({ url: '/api/connect/avisos/lista', headers: { 'x-diag-rol': 'invitado' } })).statusCode, 403);
   const H = { 'x-diag-rol': 'oficina', 'x-diag-taller': 'reyman' };
   const l = await app.inject({ url: '/api/connect/avisos/lista?pendientes=1', headers: H });
@@ -102,10 +80,4 @@ test('La oficina ve y atiende los avisos con su sesión; sin acceso no', async (
   assert.equal((await app.inject({ method: 'POST', url: `/api/connect/avisos/${id}/atendido`, headers: H })).statusCode, 404);
   const otro = await app.inject({ url: '/api/connect/avisos/lista', headers: { 'x-diag-rol': 'oficina', 'x-diag-taller': 'otro' } });
   assert.equal(otro.json().avisos.length, 0);
-});
-
-test('Límite de avisos por IP', async () => {
-  let ultimo;
-  for (let i = 0; i < 12; i++) ultimo = await app.inject({ method: 'POST', url: '/api/connect/avisos', remoteAddress: '10.9.9.9', payload: aviso() });
-  assert.equal(ultimo.statusCode, 429);
 });

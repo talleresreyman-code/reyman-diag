@@ -11,16 +11,16 @@
 
 | # | Riesgo | Gravedad | Estado |
 |---|---|---|---|
-| 1 | El enlace **no caduca nunca**. Quien lo tenga (reenvío, chat de WhatsApp de otra persona, móvil perdido) ve la ficha para siempre | Alta | **Servidor: pendiente de OK** |
+| 1 | El enlace **no caduca nunca**. Quien lo tenga (reenvío, chat de WhatsApp de otra persona, móvil perdido) ve la ficha para siempre | Alta | **Corregido: caduca a los 30 días** |
 | 2 | La app guardaba el enlace y la ficha **sin cifrar** (Preferences: también va a las copias de iCloud y de Android) | Alta | **Corregido en la app (0.5.0)** |
 | 3 | Con el móvil desbloqueado o perdido, cualquiera abría la app y veía la ficha | Alta | **Corregido: Face ID, huella o código** |
 | 4 | En el selector de apps se veía la ficha | Media | **Corregido: pantalla de privacidad** |
 | 5 | No se aceptaban las condiciones, la privacidad ni el uso de la IA al empezar | Media (legal) | **Corregido: pantalla de condiciones con versión** |
 | 6 | Si el taller desactivaba el enlace, la copia del móvil seguía viéndose | Media | **Corregido: la app la borra en cuanto el servidor dice que no vale** |
 | 7 | Un enlace `reymanconnect://` podía cambiar la ficha sin avisar | Baja | **Corregido: aviso y Face ID para sustituirla** |
-| 8 | El código viaja en la dirección (URL): queda en historiales y registros | Media | **Servidor: pendiente de OK** |
-| 9 | No hay límite de peticiones por IP en los webhooks del área de clientes | Baja (el código no se puede adivinar) | **Servidor: pendiente de OK** |
-| 10 | En el servidor de Diag siguen activas las rutas antiguas `/api/connect/talleres` y `/api/connect/avisos`, que ya no se usan | Baja | **Servidor: pendiente de OK** |
+| 8 | El código viaja en la dirección (URL): queda en historiales y registros | Media | **Corregido: la app usa su clave en cabecera** |
+| 9 | No hay límite de peticiones por IP en los webhooks del área de clientes | Baja (el código no se puede adivinar) | **Pendiente: regla en Cloudflare (a mano)** |
+| 10 | En el servidor de Diag siguen activas las rutas antiguas `/api/connect/talleres` y `/api/connect/avisos`, que ya no se usan | Baja | **Corregido: quitadas (0.7.0)** |
 
 ## Hecho en la app (0.5.0)
 
@@ -55,30 +55,34 @@
 - Siempre disponible, también desde la pantalla de bloqueo.
 - Borra todo lo privado del llavero.
 
-## Propuesta para el servidor (pendiente de OK de José: afecta a todos los clientes y a la web)
+## Hecho en el servidor (21/11/2026, con OK de José) · app 0.7.0
 
 ### 1. Enlaces con caducidad
-- El enlace de WhatsApp sirve **30 días** para abrir la web o vincular la app.
-- Después se pide uno nuevo por WhatsApp. Ya existe el flujo «enlace a petición», que comprueba que quien escribe es el titular.
-- La web lo recuerda 60 días, como ahora.
+- El enlace de WhatsApp sirve **30 días** desde que se envió (los anteriores, desde el 21/11/2026).
+- Después se pide uno nuevo por WhatsApp. El flujo «Área clientes · enlace a petición» crea ahora un código nuevo en cada envío y dice «vale 30 días».
 
 ### 2. Clave propia de cada móvil
-- Al vincular la app, el servidor da una clave distinta del enlace, guardada en el llavero.
-- Caduca a los 90 días sin uso y se puede revocar sola.
-- Así, aunque el enlace se reenvíe, solo vale en el móvil donde se vinculó.
+- Flujo n8n «Reyman Connect · vincular móvil»: `POST /webhook/reyman-connect-vincular` con `{ t, dispositivo }` → `{ ok, clave }`.
+- Tabla «Área clientes · Dispositivos»: clave, cliente, móvil, fechas, activo y quién la revocó.
+- Caduca a los **90 días sin uso**. Máximo 5 vinculaciones al día por cliente.
+- Las instalaciones anteriores cambian su enlace por la clave solas la primera vez que se abren.
 
 ### 3. Clave fuera de la dirección
-- La app manda la clave en una cabecera, no en la URL.
+- La app manda la clave en la cabecera `x-reyman-clave`. Solo los PDF la llevan en la dirección (`?k=`), porque los abre el navegador del sistema.
 
 ### 4. Revocar desde la App Reyman
-- En la ficha del cliente, «Accesos»: lista de móviles vinculados con su fecha y el botón «Cerrar en todos».
+- Flujo n8n «App Reyman · móviles de Reyman Connect del cliente»: `POST /webhook/reyman-app-connect-moviles` (cabecera `x-reyman-app`).
+- `{ accion: 'listar' | 'revocar' | 'revocar_todos', cod_cliente, id?, quien }`. Nunca devuelve las claves.
+- **Pendiente:** la pantalla «Accesos» en la ficha del cliente de la App Reyman (repositorio reyman-app).
 
-### 5. Aviso al cliente por WhatsApp al vincular un móvil nuevo
-- Dentro de la ventana de 24 h es gratis. Si no, plantilla de unos céntimos.
+### 5. Aviso al cliente por WhatsApp al vincular un móvil
+- Y aviso al taller por Telegram. Dentro de la ventana de 24 h es gratis; fuera, plantilla de unos céntimos.
 
-### 6. Límite de peticiones por IP
-- En Cloudflare, delante de `n8n.talleresreyman.es/webhook/reyman-mitaller-*`.
+### 6. Límite de peticiones por IP (pendiente, a mano)
+- En Cloudflare → talleresreyman.es → Seguridad → WAF → Reglas de limitación de velocidad.
+- Regla: ruta que empieza por `/webhook/reyman-mitaller` o `/webhook/reyman-connect`, 30 peticiones por minuto por IP, bloquear 10 minutos. Entra en el plan gratuito (una regla).
 
-### 7. Quitar las rutas antiguas `/api/connect/*` del servidor de Diag
+### 7. Rutas antiguas `/api/connect/*` del servidor de Diag
+- Quitadas las públicas de ficha del taller y envío de avisos. Siguen las del diagnóstico remoto (`/api/connect/remoto/*`) y la consulta de los avisos antiguos para la oficina, con sesión.
 
 Coste: sin IA. Solo el aviso del punto 5 si cae fuera de la ventana de WhatsApp.

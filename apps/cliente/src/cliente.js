@@ -36,29 +36,70 @@ async function plugins() {
   try { navegador = (await import('@capacitor/browser')).Browser; } catch { /* */ }
 }
 
-/** Datos de Mi taller: { ok, cliente, vehiculos[], documentos[], presupuestos[], actualizado } */
-export async function pedirDatos(token, { demo = false } = {}) {
-  if (demo) { await new Promise((r) => setTimeout(r, 500)); return DATOS_DEMO; }
-  if (!RE_TOKEN.test(String(token || ''))) throw new Error('Ese enlace no es válido.');
+/**
+ * Credencial del cliente: { clave } (clave propia de este móvil, la normal) o { token } (enlace de WhatsApp, solo para
+ * previsualizar la ficha antes de vincular y para instalaciones antiguas).
+ */
+const RE_CLAVE = /^[A-Za-z0-9]{40,64}$/;
+export const credDe = (cliente) => (cliente?.clave ? { clave: cliente.clave } : cliente?.token ? { token: cliente.token } : null);
+
+async function pedir(url, { metodo = 'GET', cabeceras = {}, cuerpo = null } = {}) {
   await plugins();
-  const url = `${N8N}/reyman-mitaller-datos?t=${encodeURIComponent(token)}`;
-  let j;
   try {
     // En la app, petición nativa (la web de n8n solo admite talleresreyman.com como origen del navegador)
-    if (http) { const r = await http.get({ url, headers: { Accept: 'application/json' }, connectTimeout: 20000, readTimeout: 30000 }); j = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; }
-    else j = await (await fetch(url, { headers: { Accept: 'application/json' } })).json();
+    if (http) {
+      const r = metodo === 'GET'
+        ? await http.get({ url, headers: { Accept: 'application/json', ...cabeceras }, connectTimeout: 20000, readTimeout: 30000 })
+        : await http.post({ url, headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...cabeceras }, data: cuerpo, connectTimeout: 20000, readTimeout: 30000 });
+      return typeof r.data === 'string' ? JSON.parse(r.data) : r.data;
+    }
+    const r = await fetch(url, metodo === 'GET' ? { headers: { Accept: 'application/json', ...cabeceras } } : { method: 'POST', headers: { 'Content-Type': 'application/json', ...cabeceras }, body: JSON.stringify(cuerpo) });
+    return await r.json();
   } catch {
     throw new Error('No se ha podido contactar con el taller. Revisa la conexión a internet.');
   }
-  if (!j?.ok) {
-    const e = new Error(j?.error || 'No se han podido cargar tus datos.');
-    e.revocado = /no es v[aá]lido|desactivado/i.test(j?.error || ''); // el enlace ya no vale: hay que borrar la ficha del móvil
-    throw e;
-  }
+}
+
+function errorServidor(j, porDefecto) {
+  const e = new Error(j?.error || porDefecto);
+  // El acceso ya no vale (desactivado por el taller, caducado o inexistente): hay que borrar la ficha del móvil
+  e.revocado = /no es v[aá]lido|desactivado|caducado/i.test(j?.error || '');
+  return e;
+}
+
+/** Datos de Mi taller: { ok, cliente, telefono, vehiculos[], documentos[], presupuestos[], actualizado } */
+export async function pedirDatos(cred, { demo = false } = {}) {
+  if (demo) { await new Promise((r) => setTimeout(r, 500)); return DATOS_DEMO; }
+  if (typeof cred === 'string') cred = { token: cred };
+  let j;
+  if (cred?.clave && RE_CLAVE.test(cred.clave)) j = await pedir(`${N8N}/reyman-mitaller-datos`, { cabeceras: { 'x-reyman-clave': cred.clave } });
+  else if (cred?.token && RE_TOKEN.test(cred.token)) j = await pedir(`${N8N}/reyman-mitaller-datos?t=${encodeURIComponent(cred.token)}`);
+  else throw Object.assign(new Error('Ese enlace no es válido.'), { revocado: true });
+  if (!j?.ok) throw errorServidor(j, 'No se han podido cargar tus datos.');
   return j;
 }
 
-export const urlDocumento = (token, id) => `${N8N}/reyman-mitaller-doc?t=${encodeURIComponent(token)}&d=${encodeURIComponent(id)}`;
+/** Nombre corto del móvil para que el cliente lo reconozca en el aviso («iPhone», «Android»…). */
+export function nombreDispositivo(ua = globalThis.navigator?.userAgent || '') {
+  if (/iPad/i.test(ua)) return 'iPad';
+  if (/iPhone/i.test(ua)) return 'iPhone';
+  if (/Android/i.test(ua)) return 'Android';
+  return 'navegador';
+}
+
+/** Cambia el enlace de WhatsApp por una clave propia de este móvil (el servidor avisa al cliente por WhatsApp). */
+export async function vincularMovil(token, { demo = false } = {}) {
+  if (demo) { await new Promise((r) => setTimeout(r, 400)); return 'DemoClaveDeMovil0123456789abcdefghijklmnopqrstuv'; }
+  const j = await pedir(`${N8N}/reyman-connect-vincular`, { metodo: 'POST', cuerpo: { t: token, dispositivo: `Reyman Connect · ${nombreDispositivo()}` } });
+  if (!j?.ok || !RE_CLAVE.test(j.clave || '')) throw errorServidor(j, 'No se ha podido añadir tu ficha a este móvil.');
+  return j.clave;
+}
+
+export const urlDocumento = (cred, id) => {
+  if (typeof cred === 'string') cred = { token: cred };
+  const q = cred?.clave ? `k=${encodeURIComponent(cred.clave)}` : `t=${encodeURIComponent(cred?.token || '')}`;
+  return `${N8N}/reyman-mitaller-doc?${q}&d=${encodeURIComponent(id)}`;
+};
 export const urlPresupuesto = (t) => `${WEB}/mi-presupuesto/?t=${encodeURIComponent(t)}`;
 export const urlMiTallerWeb = (token) => `${WEB}/mi-taller/?t=${encodeURIComponent(token)}`;
 

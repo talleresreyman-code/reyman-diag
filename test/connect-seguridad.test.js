@@ -51,3 +51,26 @@ test('Connect · enlace desactivado por el taller = borrar la ficha; sin conexi�
     await assert.rejects(pedirDatos(T), (e) => !accesoRevocado(e));
   } finally { globalThis.fetch = antes; }
 });
+
+test('Connect · la clave del móvil va en cabecera, nunca en la dirección', async () => {
+  const { credDe, urlDocumento: urlDoc, vincularMovil, nombreDispositivo } = await import('../apps/cliente/src/cliente.js');
+  const K = 'a'.repeat(48);
+  const antes = globalThis.fetch;
+  try {
+    let visto;
+    globalThis.fetch = async (url, op) => { visto = { url, op }; return { json: async () => ({ ok: true, vehiculos: [] }) }; };
+    await pedirDatos({ clave: K });
+    assert.ok(!visto.url.includes(K));
+    assert.equal(visto.op.headers['x-reyman-clave'], K);
+    globalThis.fetch = async (url, op) => { visto = { url, op }; return { json: async () => ({ ok: true, clave: K }) }; };
+    assert.equal(await vincularMovil('AbCdEf0123456789AbCdEf0123'), K);
+    assert.ok(visto.url.endsWith('/reyman-connect-vincular'));
+    globalThis.fetch = async () => ({ json: async () => ({ ok: false, error: 'Este enlace ha caducado. Pide uno nuevo.' }) });
+    await assert.rejects(vincularMovil('AbCdEf0123456789AbCdEf0123'), (e) => accesoRevocado(e));
+    await assert.rejects(pedirDatos({ clave: 'corta' }), (e) => accesoRevocado(e));
+  } finally { globalThis.fetch = antes; }
+  assert.deepEqual(credDe({ clave: K, token: 'x' }), { clave: K });
+  assert.ok(urlDoc({ clave: K }, 7).includes(`k=${K}`));
+  assert.equal(nombreDispositivo('Mozilla (iPhone; CPU iPhone OS 18)'), 'iPhone');
+  assert.equal(nombreDispositivo('Linux; Android 15'), 'Android');
+});

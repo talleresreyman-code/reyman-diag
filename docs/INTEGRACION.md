@@ -69,12 +69,10 @@ Flujo «Reyman Diag · sesiones a OneDrive». Cada noche a las 4:27 (escalonado 
 
 ## Reyman Connect (app de cliente) · v0.3
 
-Rutas nuevas en el servidor de Reyman Diag:
+Rutas del servidor de Reyman Diag (desde la 0.7.0 los datos del cliente van contra n8n con clave por móvil; las rutas públicas `talleres` y `avisos` se quitaron; aquí solo queda el diagnóstico remoto):
 
 | Ruta | Sesión | Para qué |
 |---|---|---|
-| `GET /api/connect/talleres/:codigo` | No | Ficha pública del taller (nombre, teléfono, WhatsApp, dirección, horario) para vincularlo en la app. |
-| `POST /api/connect/avisos` | No | La app envía el estado del coche o una petición de cita. Exige consentimiento (`consentimiento.aceptado` + versión), limpia los datos y limita a 10 avisos cada 10 min por IP. |
 | `GET /api/connect/avisos/lista?pendientes=1` | Sí | La oficina ve los avisos de su taller. |
 | `POST /api/connect/avisos/:id/atendido` | Sí | Marca un aviso como atendido (una sola vez). |
 

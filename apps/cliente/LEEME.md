@@ -87,8 +87,7 @@ En «Inicio → Adaptador · Cambiar» se elige **Bluetooth** o **Wi-Fi**.
 
 ## Servidor
 
-- La app envía los avisos a `https://diag.talleresreyman.es/api/connect/avisos` (cambiable con `window.REYMAN_CONNECT_API`). Ver `docs/INTEGRACION.md`.
-- Los orígenes de la app nativa ya están permitidos por defecto (`CONNECT_ORIGENES`).
+- Del servidor de Diag solo usa el diagnóstico remoto (`/api/connect/remoto/*`). Lo demás va contra n8n: `reyman-connect-vincular` (cambia el enlace por la clave del móvil), `reyman-mitaller-datos` y `reyman-mitaller-doc` (con la clave), y `reyman-online` (prediagnóstico). Ver `docs/SEGURIDAD_CONNECT.md`.
 
 ## Pendiente
 

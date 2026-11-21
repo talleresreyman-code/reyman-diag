@@ -2,7 +2,7 @@
 
 import { st, DEMO, pintar } from '../estado.js';
 import { $, esc, I, toast, fmtFechaHora, chips } from '../ui.js';
-import { urlDocumento, urlPresupuesto, abrir } from '../cliente.js';
+import { urlDocumento, urlPresupuesto, abrir, credDe } from '../cliente.js';
 import { limpiaMatricula } from '../solicitudes.js';
 import { enlazarPegar, urlPedirEnlace, refrescarCliente, refrescarSiViejo, quitarFicha } from './bienvenida.js';
 
@@ -42,8 +42,8 @@ export function vDocs() {
 export function eDocs(el) {
   enlazarPegar(el);
   if (!st.datos.cliente) return;
-  const tok = st.datos.cliente.token;
-  el.querySelectorAll('[data-doc]').forEach((b) => b.addEventListener('click', () => (DEMO ? toast('En la demostración no hay PDF.') : abrir(urlDocumento(tok, b.dataset.doc)))));
+  const cred = credDe(st.datos.cliente);
+  el.querySelectorAll('[data-doc]').forEach((b) => b.addEventListener('click', () => (DEMO ? toast('En la demostración no hay PDF.') : abrir(urlDocumento(cred, b.dataset.doc)))));
   el.querySelectorAll('[data-presu]').forEach((b) => b.addEventListener('click', () => (DEMO ? toast('En la demostración no hay presupuesto.') : abrir(urlPresupuesto(b.dataset.presu)))));
   el.querySelectorAll('[data-chips]').forEach((g) => g.addEventListener('click', (e) => {
     const b = e.target.closest('.chip');

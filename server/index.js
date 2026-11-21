@@ -10,7 +10,7 @@ import { crearStore } from './store.js';
 import { crearAuth, tiene, PERMISOS } from './auth.js';
 import { buscarOts, enviarCorreo, diagnosticoIa } from './integraciones.js';
 import { pdfInforme } from './pdf.js';
-import { buscarTaller, fichaPublica, TALLERES_CONNECT } from './connect-talleres.js';
+import { buscarTaller, TALLERES_CONNECT } from './connect-talleres.js';
 import { desdeSesion, aCsv as visorCsv } from '../packages/obd-core/src/visor.js';
 import { evaluarCvn, norm as normCvn, normCalid } from '../packages/obd-core/src/cvn.js';
 
@@ -43,7 +43,6 @@ export function leerConfig(env = process.env) {
     iaTopeMes: Number(env.IA_TOPE_MES_EUR || 15),
     // Reyman Connect (app de cliente)
     connectOrigenes: (env.CONNECT_ORIGENES || 'capacitor://localhost,https://localhost,http://localhost').split(',').map((x) => x.trim()).filter(Boolean),
-    n8nConnectUrl: env.N8N_CONNECT_URL, // webhook de n8n para avisar por Telegram de los avisos nuevos
   };
 }
 
@@ -79,10 +78,10 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   });
 
   // --- Reyman Connect: rutas públicas para la app de cliente ---
-  // Solo dos rutas sin sesión: ficha del taller y envío de avisos (con consentimiento y límite por IP).
+  // Sin sesión solo queda el diagnóstico remoto. La ficha del taller y el envío de avisos se quitaron en Connect 0.7.0:
+  // la app va contra n8n con una clave por móvil.
   function esPublicaConnect(req) {
-    const u = req.url.split('?')[0];
-    return (u === '/api/connect/avisos' && (req.method === 'POST' || req.method === 'OPTIONS')) || u.startsWith('/api/connect/talleres/') || u.startsWith('/api/connect/remoto/');
+    return req.url.split('?')[0].startsWith('/api/connect/remoto/');
   }
   const talleresConnect = opciones.talleresConnect || TALLERES_CONNECT;
   app.addHook('onSend', async (req, rep, payload) => {
@@ -106,43 +105,6 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     if (limites.size > 5000) limites.clear();
     return true;
   };
-  const texto = (x, max) => (x === undefined || x === null ? null : String(x).slice(0, max).trim() || null);
-
-  app.options('/api/connect/avisos', async (req, rep) => rep.code(204).send());
-  app.get('/api/connect/talleres/:codigo', async (req, rep) => {
-    const t = buscarTaller(req.params.codigo, talleresConnect);
-    if (!t) return rep.code(404).send({ error: 'No hay ningún taller con ese código.' });
-    return { codigo: t.codigo, taller: fichaPublica(t) };
-  });
-  app.post('/api/connect/avisos', async (req, rep) => {
-    const b = req.body || {};
-    const t = buscarTaller(b.codigoTaller, talleresConnect);
-    if (!t) return rep.code(404).send({ error: 'No hay ningún taller con ese código.' });
-    if (b.consentimiento?.aceptado !== true || !b.consentimiento?.version) return rep.code(400).send({ error: 'Falta tu consentimiento para enviar los datos al taller.' });
-    const tipo = b.tipo === 'cita' ? 'cita' : 'estado';
-    const contacto = b.contacto ? { nombre: texto(b.contacto.nombre, 80), telefono: texto(b.contacto.telefono, 30) } : null;
-    if (tipo === 'cita' && (!contacto?.nombre || !contacto?.telefono)) return rep.code(400).send({ error: 'Para pedir cita necesitamos tu nombre y tu teléfono.' });
-    if (!dentroDeLimite(`connect:${ip(req)}`)) return rep.code(429).send({ error: 'Has enviado muchos avisos seguidos. Espera unos minutos.' });
-    const averias = (Array.isArray(b.averias) ? b.averias : []).slice(0, 40).map((a) => ({
-      codigo: texto(a.codigo, 8), tipo: texto(a.tipo, 20), descripcion: texto(a.descripcion, 200), gravedad: texto(a.gravedad, 20),
-    })).filter((a) => a.codigo && /^[PCBU][0-9A-F]{4}$/i.test(a.codigo));
-    const km = Number.isFinite(Number(b.km)) && Number(b.km) > 0 && Number(b.km) < 3000000 ? Math.round(Number(b.km)) : null;
-    const bateria = b.bateria && typeof b.bateria === 'object' ? {
-      tension: Number(b.bateria.tension) || null, estado: texto(b.bateria.estado, 20), situacion: texto(b.bateria.situacion, 20), minimoArranque: Number(b.bateria.minimoArranque) || null,
-    } : null;
-    const vehiculo = b.vehiculo && typeof b.vehiculo === 'object' ? { marca: texto(b.vehiculo.marca, 40), modelo: texto(b.vehiculo.modelo, 60), anio: Number(b.vehiculo.anio) || null } : null;
-    const r = await store.crearAvisoConnect(t.tenant, {
-      codigo_taller: t.codigo, tipo, matricula: limpiarMat(texto(b.matricula, 12)), vin: texto(b.vin, 17), km, vehiculo, averias, bateria, contacto,
-      mensaje: texto(b.mensaje, 1000), consentimiento: { aceptado: true, version: texto(b.consentimiento.version, 20), fecha: texto(b.consentimiento.fecha, 30) }, ip: ip(req),
-    });
-    if (cfg.n8nConnectUrl) {
-      // Aviso a n8n (Telegram del taller). Si falla, el aviso ya está guardado.
-      fetch(cfg.n8nConnectUrl, { method: 'POST', headers: { 'content-type': 'application/json', ...(cfg.n8nClave ? { 'x-reyman-clave': cfg.n8nClave } : {}) },
-        body: JSON.stringify({ id: r.id, tenant: t.tenant, tipo, matricula: limpiarMat(b.matricula), km, averias: averias.map((a) => a.codigo), bateria, contacto, mensaje: texto(b.mensaje, 300) }) })
-        .catch((e) => req.log.warn(e));
-    }
-    return { ok: true, id: r.id, taller: t.nombre };
-  });
   // Diagnóstico remoto (app del cliente ↔ Reyman Diag)
   const remoto = registrarRemoto(app, { store, buscarTaller, talleresConnect, dentroDeLimite, ip, opciones: opciones.remoto });
   app.decorate('remoto', remoto);

@@ -2,7 +2,7 @@
 
 import { st, DEMO, TALLER, persistir, pintar } from '../estado.js';
 import { $, esc, I, toast, nombreCorto } from '../ui.js';
-import { tokenDeTexto, pedirDatos, leerPortapapeles } from '../cliente.js';
+import { tokenDeTexto, pedirDatos, leerPortapapeles, vincularMovil, credDe } from '../cliente.js';
 import { borrarFicha } from '../almacen.js';
 import { proteccionDisponible, verificar, accesoRevocado } from '../seguridad.js';
 import { urlWhatsApp } from '../solicitudes.js';
@@ -20,7 +20,7 @@ export function pintarBienvenida(raiz) {
     ${v?.error ? `<div class="panel"><div class="aviso rojo" role="alert">${esc(v.error)}</div><div class="fila-btn col"><a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedir un enlace nuevo por WhatsApp</a><button class="btn fantasma" id="b-cancelar">Volver</button></div></div>` : ''}
     ${v?.datos ? `<div class="panel">
         <p>Hemos encontrado tu ficha de <strong>Talleres Reyman</strong>${coches.length ? ` con ${coches.length === 1 ? 'tu' : 'tus'} ${coches.slice(0, 3).map((c) => `${esc([c.marca, c.modelo].filter(Boolean).join(' '))} <span class="matricula">${esc(c.matricula)}</span>`).join(', ')}${coches.length > 3 ? '…' : ''}` : ''}.</p>
-        ${st.datos.cliente && st.datos.cliente.token !== v.token ? `<div class="aviso ambar" style="margin-bottom:10px">Esta app ya tiene la ficha de <strong>${esc(nombreCorto(st.datos.cliente.nombre) || 'otra persona')}</strong>. Si entras, se sustituye por esta.</div>` : ''}
+        ${st.datos.cliente && st.datos.cliente.nombre !== v.datos?.cliente ? `<div class="aviso ambar" style="margin-bottom:10px">Esta app ya tiene la ficha de <strong>${esc(nombreCorto(st.datos.cliente.nombre) || 'otra persona')}</strong>. Si entras, se sustituye por esta.</div>` : ''}
         ${v.errorProteccion ? `<div class="aviso rojo" role="alert" style="margin-bottom:10px">${esc(v.errorProteccion)}</div>` : ''}
         <button class="btn grande" id="b-entrar">Entrar</button>
         <p class="peq suave centrado" style="margin-top:8px">Sin usuario ni contraseña. Tu ficha quedará protegida con Face ID, huella o el código de tu móvil.</p>
@@ -80,10 +80,16 @@ async function confirmarVinculo() {
     st.vincular.errorProteccion = r.cancelado ? 'Hace falta confirmar con Face ID, huella o tu código para guardar la ficha.' : 'No se ha podido comprobar que eres tú. Vuelve a intentarlo.';
     return pintar();
   }
+  // El enlace de WhatsApp se cambia por una clave propia de este móvil (el enlace caduca; la clave, solo si no se usa en 90 días)
+  let clave;
+  try { clave = await vincularMovil(token, { demo: DEMO }); } catch (e) {
+    st.vincular.errorProteccion = e.message;
+    return pintar();
+  }
   const d = st.datos;
-  if (d.cliente && d.cliente.token !== token) await borrarFicha(d); // ficha de otra persona: fuera
+  if (d.cliente && d.cliente.nombre !== (datos.cliente || '')) await borrarFicha(d); // ficha de otra persona: fuera
   const ahora = new Date().toISOString();
-  d.cliente = { token, nombre: datos.cliente || '', desde: ahora, ultimoUso: ahora };
+  d.cliente = { clave, nombre: datos.cliente || '', desde: ahora, ultimoUso: ahora };
   d.clienteDatos = datos;
   d.bienvenidaVista = true;
   if (!d.contacto?.nombre && datos.cliente) d.contacto = { ...(d.contacto || {}), nombre: datos.cliente };
@@ -103,7 +109,13 @@ export async function refrescarCliente() {
   if (!c || st.cargandoCliente) return;
   st.cargandoCliente = true;
   try {
-    st.datos.clienteDatos = await pedirDatos(c.token, { demo: DEMO });
+    // Instalaciones anteriores (guardaban el enlace): se cambia por la clave del móvil la primera vez
+    if (!c.clave && c.token && !DEMO) {
+      c.clave = await vincularMovil(c.token);
+      delete c.token;
+      await persistir();
+    }
+    st.datos.clienteDatos = await pedirDatos(credDe(c), { demo: DEMO });
     st.datos.cliente.ultimoUso = new Date().toISOString();
     await persistir();
     if (!document.querySelector('dialog[open]') && st.vista !== 'solicitud') pintar();
