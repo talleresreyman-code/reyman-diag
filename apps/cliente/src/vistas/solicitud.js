@@ -16,7 +16,10 @@ export function abrirSolicitud(tipo, { coche = null, sel = [] } = {}) {
   const coches = cochesDisponibles(st.datos);
   const c = coche && coches.some((x) => x.id === coche) ? coche : coches.length === 1 ? coches[0].id : null;
   st.sol = nuevaSolicitud(tipo, { coche: c, sel });
-  if (tipo === 'averia') st.sol.codigosAdaptador = codigosRecientes();
+  if (tipo === 'averia') {
+    st.sol.codigosAdaptador = codigosRecientes();
+    if (st.datos.consentimiento?.privacidad && st.datos.consentimiento?.ia) { st.sol.rgpd = true; st.sol.acepto = true; }
+  }
   if (tipo === 'consulta' && sel.includes('adaptador')) { st.sol.sel = []; st.sol.sobre = 'general'; st.sol.texto = 'Quiero el adaptador OBD para usarlo con Reyman Connect. ¿Cuándo puedo pasar a recogerlo?'; }
   ir('solicitud');
 }

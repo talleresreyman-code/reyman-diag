@@ -24,6 +24,7 @@ if (plataforma === 'android') {
     '<uses-permission android:name="android.permission.INTERNET" />',
     '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
     '<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />',
+    '<uses-permission android:name="android.permission.USE_BIOMETRIC" />',
   ].filter((p) => !x.includes(p.match(/android:name="([^"]+)"/)[1] + '"'));
   x = x.replace('</manifest>', `    ${permisos.join('\n    ')}\n</manifest>`);
   // Enlace reymanconnect://mitaller?t=… (página «abrir la app» del taller): abre la app ya vinculada
@@ -53,6 +54,7 @@ if (plataforma === 'android') {
   const claves = {
     NSBluetoothAlwaysUsageDescription: 'Reyman Connect usa el Bluetooth para conectar con el adaptador OBD de tu coche.',
     NSLocalNetworkUsageDescription: 'Reyman Connect se conecta por Wi-Fi con el adaptador OBD de tu coche (por ejemplo, WiCAN Pro).',
+    NSFaceIDUsageDescription: 'Reyman Connect usa Face ID para proteger tu ficha del taller si pierdes el móvil.',
   };
   for (const [k, v] of Object.entries(claves)) if (!x.includes(`<key>${k}</key>`)) x = x.replace(/<dict>/, `<dict>\n\t<key>${k}</key>\n\t<string>${v}</string>`);
   // Enlace reymanconnect://mitaller?t=… (página «abrir la app» del taller): abre la app ya vinculada

@@ -3,6 +3,8 @@
 import { st, DEMO, TALLER, persistir, pintar } from '../estado.js';
 import { $, esc, I, toast, nombreCorto } from '../ui.js';
 import { tokenDeTexto, pedirDatos, leerPortapapeles } from '../cliente.js';
+import { borrarFicha } from '../almacen.js';
+import { proteccionDisponible, verificar, accesoRevocado } from '../seguridad.js';
 import { urlWhatsApp } from '../solicitudes.js';
 
 export const urlPedirEnlace = () => urlWhatsApp('Hola, quiero mi enlace de cliente para la app Reyman Connect.', TALLER.whatsapp);
@@ -18,8 +20,10 @@ export function pintarBienvenida(raiz) {
     ${v?.error ? `<div class="panel"><div class="aviso rojo" role="alert">${esc(v.error)}</div><div class="fila-btn col"><a class="btn sec" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedir un enlace nuevo por WhatsApp</a><button class="btn fantasma" id="b-cancelar">Volver</button></div></div>` : ''}
     ${v?.datos ? `<div class="panel">
         <p>Hemos encontrado tu ficha de <strong>Talleres Reyman</strong>${coches.length ? ` con ${coches.length === 1 ? 'tu' : 'tus'} ${coches.slice(0, 3).map((c) => `${esc([c.marca, c.modelo].filter(Boolean).join(' '))} <span class="matricula">${esc(c.matricula)}</span>`).join(', ')}${coches.length > 3 ? '…' : ''}` : ''}.</p>
+        ${st.datos.cliente && st.datos.cliente.token !== v.token ? `<div class="aviso ambar" style="margin-bottom:10px">Esta app ya tiene la ficha de <strong>${esc(nombreCorto(st.datos.cliente.nombre) || 'otra persona')}</strong>. Si entras, se sustituye por esta.</div>` : ''}
+        ${v.errorProteccion ? `<div class="aviso rojo" role="alert" style="margin-bottom:10px">${esc(v.errorProteccion)}</div>` : ''}
         <button class="btn grande" id="b-entrar">Entrar</button>
-        <p class="peq suave centrado" style="margin-top:8px">Sin usuario ni contraseña.</p>
+        <p class="peq suave centrado" style="margin-top:8px">Sin usuario ni contraseña. Tu ficha quedará protegida con Face ID, huella o el código de tu móvil.</p>
         <button class="enlace centrado" id="b-cancelar">No soy yo</button>
       </div>` : ''}
     ${!v ? `<div class="panel">
@@ -65,8 +69,21 @@ export async function prepararVinculo(token) {
 async function confirmarVinculo() {
   const { token, datos } = st.vincular || {};
   if (!datos) return;
+  // La ficha solo se guarda en un móvil protegido (Face ID, huella o código) y tras confirmar que es su dueño
+  const p = await proteccionDisponible();
+  if (!p.disponible) {
+    st.vincular.errorProteccion = 'Para guardar tu ficha, tu móvil tiene que tener Face ID, huella o un código de bloqueo. Actívalo en los ajustes del móvil y vuelve a intentarlo.';
+    return pintar();
+  }
+  const r = await verificar('Para proteger tu ficha en este móvil');
+  if (!r.ok) {
+    st.vincular.errorProteccion = r.cancelado ? 'Hace falta confirmar con Face ID, huella o tu código para guardar la ficha.' : 'No se ha podido comprobar que eres tú. Vuelve a intentarlo.';
+    return pintar();
+  }
   const d = st.datos;
-  d.cliente = { token, nombre: datos.cliente || '', desde: new Date().toISOString() };
+  if (d.cliente && d.cliente.token !== token) await borrarFicha(d); // ficha de otra persona: fuera
+  const ahora = new Date().toISOString();
+  d.cliente = { token, nombre: datos.cliente || '', desde: ahora, ultimoUso: ahora };
   d.clienteDatos = datos;
   d.bienvenidaVista = true;
   if (!d.contacto?.nombre && datos.cliente) d.contacto = { ...(d.contacto || {}), nombre: datos.cliente };
@@ -87,9 +104,18 @@ export async function refrescarCliente() {
   st.cargandoCliente = true;
   try {
     st.datos.clienteDatos = await pedirDatos(c.token, { demo: DEMO });
+    st.datos.cliente.ultimoUso = new Date().toISOString();
     await persistir();
     if (!document.querySelector('dialog[open]') && st.vista !== 'solicitud') pintar();
-  } catch { /* se queda la última copia */ }
+  } catch (e) {
+    // El taller ha desactivado el enlace (por ejemplo, porque el cliente ha perdido el móvil): se borra la ficha de aquí
+    if (accesoRevocado(e)) {
+      await borrarFicha(st.datos);
+      toast('Tu acceso a la ficha ya no es válido y la hemos quitado de este móvil. Pídenos un enlace nuevo por WhatsApp.');
+      pintar();
+    }
+    /* si es la conexión, se queda la última copia */
+  }
   st.cargandoCliente = false;
 }
 
@@ -101,8 +127,7 @@ export function refrescarSiViejo() {
 
 export async function quitarFicha() {
   if (!confirm('¿Quitar tu ficha de Talleres Reyman de esta app? Podrás volver a entrar con tu enlace de WhatsApp.')) return;
-  st.datos.cliente = null; st.datos.clienteDatos = null;
-  await persistir();
+  await borrarFicha(st.datos);
   toast('Ficha quitada.');
   pintar();
 }

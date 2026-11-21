@@ -209,3 +209,7 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 /* Pestañas: la activa con fondo de color */
 .tabs svg { padding: 3px 14px; width: 52px; height: 30px; border-radius: 99px; transition: background 0.15s ease; }
 .tabs [aria-current='page'] svg { background: var(--azul-fondo); color: var(--azul-hondo); }
+/* Condiciones de la primera vez y bloqueo */
+.condiciones { justify-content: flex-start; background: linear-gradient(180deg, #143f7a 0%, #1d57a5 260px, var(--fondo) 260px); }
+.condiciones .panel h2 { font-size: 1.05rem; margin-bottom: 6px; }
+.bloqueo .btn.grande { margin-top: 0; }

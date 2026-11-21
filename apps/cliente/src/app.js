@@ -7,11 +7,13 @@
 //   Diagnóstico → lo del adaptador OBD (opcional)
 // Todo lo que el cliente pide sale por WhatsApp, ya escrito y ordenado (vistas/solicitud.js).
 
-import { cargar } from './almacen.js';
+import { cargar, borrarFicha } from './almacen.js';
+import { faltaConsentimiento, bloquearAlVolver, fichaCaducada, activarPrivacidad } from './seguridad.js';
+import { pintarCondiciones, pintarBloqueo, desbloquear } from './vistas/acceso.js';
 import { formasDeConectar, esNativa } from './comprobacion.js';
 import { tokenDeTexto, alAbrirEnlace, alBotonAtras } from './cliente.js';
 import { st, DEMO, alPintar, ir, volver, esPestana } from './estado.js';
-import { $, esc, I } from './ui.js';
+import { $, esc, I, toast } from './ui.js';
 import { pintarBienvenida, prepararVinculo, refrescarCliente } from './vistas/bienvenida.js';
 import { vInicio, eInicio } from './vistas/inicio.js';
 import { vCoches, eCoches } from './vistas/coches.js';
@@ -39,6 +41,9 @@ const pestanaDe = (v) => (esPestana(v) ? v : ['averias', 'bateria', 'mant'].incl
 
 function pintar() {
   const raiz = document.getElementById('app');
+  // Orden: 1) condiciones (primera vez o cambiadas) · 2) bloqueo con Face ID si hay ficha · 3) bienvenida / vínculo · 4) app
+  if (faltaConsentimiento(st.datos)) return pintarCondiciones(raiz);
+  if (st.bloqueada) return pintarBloqueo(raiz, alDesbloquear);
   if (st.vincular || (!st.datos.cliente && !st.datos.bienvenidaVista)) return pintarBienvenida(raiz);
   if (!VISTAS[st.vista] || (st.vista === 'solicitud' && !st.sol)) st.vista = 'inicio';
   const [vista, enlazar] = VISTAS[st.vista];
@@ -60,6 +65,9 @@ function pintar() {
 }
 alPintar(pintar);
 
+/** Tras desbloquear: se piden los datos frescos al taller. */
+function alDesbloquear() { if (st.datos.cliente) refrescarCliente(); }
+
 async function iniciar() {
   st.datos = await cargar();
   window.__reymanArrancada = true; // para el aviso de «no ha podido arrancar» de index.html
@@ -67,14 +75,34 @@ async function iniciar() {
   if (!DEMO && !esNativa() && !formasDeConectar().webBle) st.error = 'Este navegador no permite Bluetooth. Usa la app Reyman Connect o Chrome en Android.';
   // Quien ya tenía la app vinculada por código de taller (versiones 0.1–0.3) no vuelve a ver la bienvenida
   if (st.datos.taller) st.datos.bienvenidaVista = true;
+  // Ficha sin abrir en 90 días: se borra del móvil (hay que volver a añadirla con el enlace)
+  if (fichaCaducada(st.datos.cliente)) {
+    await borrarFicha(st.datos);
+    setTimeout(() => toast('Hacía tiempo que no entrabas: por seguridad hemos quitado tu ficha. Añádela de nuevo con tu enlace de WhatsApp.'), 800);
+  }
+  // Con ficha guardada, la app arranca bloqueada (Face ID / huella / código) en el móvil
+  st.bloqueada = !!st.datos.cliente && esNativa();
+  activarPrivacidad();
   // Enlace de Mi taller en la propia dirección (pruebas en el navegador: ?t=…)
   const tUrl = tokenDeTexto(location.search);
   if (tUrl && tUrl !== st.datos.cliente?.token) prepararVinculo(tUrl);
   pintar();
+  if (st.bloqueada && !faltaConsentimiento(st.datos)) desbloquear(alDesbloquear);
+  else if (st.datos.cliente) refrescarCliente();
   alAbrirEnlace((url) => { const t = tokenDeTexto(url); if (t && t !== st.datos.cliente?.token) prepararVinculo(t); });
   alBotonAtras(() => volver());
-  if (st.datos.cliente) refrescarCliente();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && st.datos.cliente) refrescarCliente(); });
+  // Al volver a la app: si ha estado más de 1 minuto fuera y hay ficha, se vuelve a bloquear
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { st.ocultaDesde = Date.now(); return; }
+    const volverABloquear = esNativa() && st.datos.cliente && !st.bloqueada && bloquearAlVolver(st.ocultaDesde);
+    st.ocultaDesde = null;
+    if (volverABloquear) {
+      st.bloqueada = true;
+      document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+      pintar();
+      desbloquear(alDesbloquear);
+    } else if (st.datos.cliente && !st.bloqueada) refrescarCliente();
+  });
 }
 
 iniciar();

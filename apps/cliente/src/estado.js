@@ -23,6 +23,10 @@ export const st = {
   midiendo: null,
   vincular: null,
   cargandoCliente: false,
+  bloqueada: false, // pantalla de Face ID / huella / código
+  errorBloqueo: null,
+  ocultaDesde: null, // cuándo se fue la app al segundo plano
+  condiciones: null, // casillas de la pantalla de condiciones
 };
 
 export async function persistir() { await guardar(st.datos); }

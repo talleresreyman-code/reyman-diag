@@ -50,7 +50,11 @@ export async function pedirDatos(token, { demo = false } = {}) {
   } catch {
     throw new Error('No se ha podido contactar con el taller. Revisa la conexión a internet.');
   }
-  if (!j?.ok) throw new Error(j?.error || 'No se han podido cargar tus datos.');
+  if (!j?.ok) {
+    const e = new Error(j?.error || 'No se han podido cargar tus datos.');
+    e.revocado = /no es v[aá]lido|desactivado/i.test(j?.error || ''); // el enlace ya no vale: hay que borrar la ficha del móvil
+    throw e;
+  }
   return j;
 }
 
