@@ -197,6 +197,9 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - Connect: pantalla encendida durante la sesión (`@capacitor-community/keep-awake`), el cliente ve «José está revisando tu coche · Ahora: leyendo averías…», aviso si se borran averías y botón «Terminar ahora». Hay que recompilar Connect (plugin nuevo).
 - Probado de punta a punta: pruebas `test/remoto.test.js` (simulador ↔ servidor ↔ Reyman Diag) y la pantalla de Reyman Diag en el navegador con un cliente simulado.
 
+### 26. Icono propio de Reyman Diag (uso interno) → v0.4.17 (21/11/2026)
+- Icono sencillo: línea de diagnóstico y «DIAG» en blanco sobre azul Reyman (#143F7A). Original en `apps/taller-nativo/assets/icono.svg`; `icono-1024.png` para iOS y `android/` (normal, redondo y adaptativo), que copia `scripts/preparar-nativo.mjs`. Mismo dibujo en la web (`apps/taller/icono.svg`, `icono-192.png`, `icono-512.png`).
+
 ### Pruebas
 - **139 pruebas automáticas.**
 

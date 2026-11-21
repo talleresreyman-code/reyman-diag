@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const plataforma = process.argv[2];
+const ASSETS = path.join(DIR, 'assets'); // icono interno: línea de diagnóstico y «DIAG» sobre azul Reyman
 
 if (plataforma === 'android') {
   const f = path.join(DIR, 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
@@ -34,7 +35,16 @@ if (plataforma === 'android') {
   // La API del WiCAN Pro va por http:// en la red local (192.168.0.10)
   if (!x.includes('usesCleartextTraffic')) x = x.replace('<application ', '<application android:usesCleartextTraffic="true" ');
   fs.writeFileSync(f, x);
-  console.log(`AndroidManifest.xml: ${permisos.length} permisos añadidos`);
+  // Icono (normal, redondo y adaptativo con fondo azul Reyman)
+  const res = path.join(DIR, 'android', 'app', 'src', 'main', 'res');
+  for (const d of fs.readdirSync(path.join(ASSETS, 'android'))) {
+    fs.mkdirSync(path.join(res, d), { recursive: true });
+    for (const a of fs.readdirSync(path.join(ASSETS, 'android', d))) fs.copyFileSync(path.join(ASSETS, 'android', d, a), path.join(res, d, a));
+  }
+  const fondo = path.join(res, 'values', 'ic_launcher_background.xml');
+  fs.mkdirSync(path.dirname(fondo), { recursive: true });
+  fs.writeFileSync(fondo, '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#143F7A</color>\n</resources>\n');
+  console.log(`AndroidManifest.xml: ${permisos.length} permisos añadidos · icono`);
 } else if (plataforma === 'ios') {
   const f = path.join(DIR, 'ios', 'App', 'App', 'Info.plist');
   let x = fs.readFileSync(f, 'utf8');
@@ -51,7 +61,13 @@ if (plataforma === 'android') {
   if (!x.includes('<key>CFBundleURLTypes</key>')) x = x.replace(/<dict>/, '<dict>\n\t<key>CFBundleURLTypes</key>\n\t<array><dict><key>CFBundleURLName</key><string>es.talleresreyman.diag</string><key>CFBundleURLSchemes</key><array><string>reymandiag</string></array></dict></array>');
   if (!x.includes('<key>LSApplicationQueriesSchemes</key>')) x = x.replace(/<dict>/, '<dict>\n\t<key>LSApplicationQueriesSchemes</key>\n\t<array><string>reyman</string></array>');
   fs.writeFileSync(f, x);
-  console.log('Info.plist: permisos de Bluetooth y red local · enlace reymandiag://');
+  // Icono de la app (un solo PNG de 1024 px; Xcode saca el resto de tamaños)
+  const set = path.join(DIR, 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset');
+  fs.mkdirSync(set, { recursive: true });
+  for (const v of fs.readdirSync(set)) if (v.endsWith('.png')) fs.rmSync(path.join(set, v));
+  fs.copyFileSync(path.join(ASSETS, 'icono-1024.png'), path.join(set, 'AppIcon-1024.png'));
+  fs.writeFileSync(path.join(set, 'Contents.json'), JSON.stringify({ images: [{ filename: 'AppIcon-1024.png', idiom: 'universal', platform: 'ios', size: '1024x1024' }], info: { author: 'xcode', version: 1 } }, null, 2));
+  console.log('Info.plist: permisos de Bluetooth y red local · enlace reymandiag:// · icono');
 } else {
   console.error('Uso: node scripts/preparar-nativo.mjs android|ios');
   process.exit(1);

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Reyman Diag · icono interno: fondo azul Reyman y la línea de diagnóstico con «DIAG» -->
+  <rect width="1024" height="1024" fill="#143F7A"/>
+  <polyline points="150,410 340,410 410,240 500,580 580,320 640,410 874,410" fill="none" stroke="#FFFFFF" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="512" y="830" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="190" letter-spacing="18" fill="#FFFFFF">DIAG</text>
+</svg>

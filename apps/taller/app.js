@@ -25,7 +25,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.16';
+const VERSION = '0.4.17';
 const api = crearApi({ demo: DEMO });
 // App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
 // adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
