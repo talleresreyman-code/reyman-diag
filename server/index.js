@@ -1,6 +1,8 @@
 // Reyman Diag · servidor (Node + Fastify)
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import fastifyWebsocket from '@fastify/websocket';
+import { registrarRemoto } from './remoto.js';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -50,6 +52,7 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   const store = opciones.store || await crearStore(cfg.store, { url: cfg.databaseUrl });
   await store.migrar();
   const sesionDe = opciones.auth || crearAuth(cfg);
+  await app.register(fastifyWebsocket, { options: { maxPayload: 16 * 1024 } });
 
   // --- autenticación ---
   app.decorateRequest('s', null);
@@ -79,7 +82,7 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
   // Solo dos rutas sin sesión: ficha del taller y envío de avisos (con consentimiento y límite por IP).
   function esPublicaConnect(req) {
     const u = req.url.split('?')[0];
-    return (u === '/api/connect/avisos' && (req.method === 'POST' || req.method === 'OPTIONS')) || u.startsWith('/api/connect/talleres/');
+    return (u === '/api/connect/avisos' && (req.method === 'POST' || req.method === 'OPTIONS')) || u.startsWith('/api/connect/talleres/') || u.startsWith('/api/connect/remoto/');
   }
   const talleresConnect = opciones.talleresConnect || TALLERES_CONNECT;
   app.addHook('onSend', async (req, rep, payload) => {
@@ -140,6 +143,9 @@ export async function crearServidor(cfg = leerConfig(), opciones = {}) {
     }
     return { ok: true, id: r.id, taller: t.nombre };
   });
+  // Diagnóstico remoto (app del cliente ↔ Reyman Diag)
+  const remoto = registrarRemoto(app, { store, buscarTaller, talleresConnect, dentroDeLimite, ip, opciones: opciones.remoto });
+  app.decorate('remoto', remoto);
   // Para la oficina del taller (con sesión de la App Reyman)
   app.get('/api/connect/avisos/lista', async (req) => ({ avisos: await store.listarAvisosConnect(req.s.tenant, { pendientes: req.query.pendientes === '1' }) }));
   app.post('/api/connect/avisos/:id/atendido', async (req, rep) => {

@@ -10,6 +10,7 @@ import { evaluarTension, medirArranque, HistorialBateria, avisosBateria, TIPOS_B
 import { estadoMantenimiento, kmActuales } from '@reyman/obd-core/mantenimiento.js';
 import { COCHES_SIM } from '@reyman/obd-core/transport/simulador.js';
 import { abrirSolicitud } from './solicitud.js';
+import { vRemoto, eRemoto, reiniciarRemoto } from './remoto.js';
 
 export function ultimaLectura() { return st.datos.lecturas[0] || null; }
 
@@ -483,6 +484,7 @@ export function vDiag() {
     </section>
     ${avisoLista(avisos)}
     ${codigos.length ? `<button class="btn sec ancho" id="enviar-taller">${I.wa} Contárselo al taller</button>` : ''}
+    ${DEMO ? '' : `<section class="panel"><h2>¿Te lo pide el taller?</h2><p class="peq suave">El taller puede revisar las averías de tu coche a distancia con tu adaptador.</p><button class="btn sec ancho" id="remoto">${I.bt} Diagnóstico remoto con el taller</button></section>`}
     <button class="enlace" id="ver-explicacion">¿Cómo funciona el diagnóstico desde el móvil?</button>
     ${DEMO ? `<section class="panel demo-ctl"><label for="demo-coche" class="etq">Coche simulado</label><select id="demo-coche">${Object.entries(COCHES_SIM).map(([k, c]) => `<option value="${k}" ${k === (d.demoCoche || 'diesel') ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select><button class="enlace" id="demo-reset">Borrar los datos de la demostración</button></section>` : ''}`;
 }
@@ -495,6 +497,7 @@ export function eDiag(el) {
   el.querySelectorAll('#mat-editar').forEach((b) => b.addEventListener('click', dialogoCoche));
   $('#adaptador', el)?.addEventListener('click', dialogoAdaptador);
   $('#enviar-taller', el)?.addEventListener('click', () => abrirSolicitud('averia', { coche: cocheApp(), sel: ['testigo'] }));
+  $('#remoto', el)?.addEventListener('click', () => { reiniciarRemoto(); ir('remoto'); });
   $('#demo-coche', el)?.addEventListener('change', async (e) => { st.datos.demoCoche = e.target.value; await desconectar(); await persistir(); toast('Coche simulado cambiado.'); });
   $('#demo-reset', el)?.addEventListener('click', async () => { await borrarTodo(); st.datos = await cargar(); st.datos.bienvenidaVista = true; await desconectar(); toast('Datos borrados.'); });
 }
@@ -504,4 +507,5 @@ export const VISTAS_DIAG = {
   averias: [vAverias, eAverias],
   bateria: [vBateria, eBateria],
   mant: [vMant, eMant],
+  remoto: [vRemoto, eRemoto],
 };

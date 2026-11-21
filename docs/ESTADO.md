@@ -189,8 +189,15 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - **0.6.0 (21/11/2026, revisión de José):** formularios con los pasos explicados y el botón de WhatsApp desactivado hasta que esté todo (dice lo que falta); en mantenimiento, «¿Cuándo necesitas recogerlo?» (cuando esté listo / hora concreta dentro del horario) en lugar de «espero en el taller»; prediagnóstico sin la palabra «gratis» y con nombre y móvil de la ficha; «¿Ya eres cliente?» plegado y oculto con ficha; tarjeta del taller con el logotipo, abierto/cerrado, dirección, horario y botones; Mis coches con matrícula como la real, motor, bastidor, km al año y «Mis datos de este coche» (seguro, póliza, vencimiento, asistencia en carretera con botón de llamada, notas; cifrado en el móvil); Diagnóstico sin adaptador explica qué es, cómo funciona y qué ventajas tiene (huecos para fotos y vídeos).
 - Pendiente (con OK de José): que el asistente reconozca el formato de la app y deje la solicitud como cita pendiente en la App Reyman; API de clientes en la App Reyman (sustituye a n8n/GemiCar); notificaciones push.
 
+### 25. Diagnóstico remoto (Reyman Connect ↔ Reyman Diag) → v0.4.16 / Connect 0.6.1 (21/11/2026)
+- El cliente enchufa su adaptador, pone el contacto y en Connect pulsa **Diagnóstico → «Diagnóstico remoto con el taller» → «Permitir al taller»**: la app conecta el adaptador (Bluetooth o Wi-Fi), pide un **código de 6 cifras** y lo enseña. El taller, en Reyman Diag → Conectar → **«Remoto (app del cliente)»**, mete el código y trabaja como con el adaptador en la mano (lectura completa, averías, borrado registrado, en vivo…).
+- Núcleo: `transport/remoto.js` (`crearTransporteRemoto` para Reyman Diag, `crearPuenteRemoto` para Connect, `describirComando` para que el cliente vea qué hace el taller). Servidor: `server/remoto.js` con `@fastify/websocket`: `POST /api/connect/remoto/abrir` (público, con permiso del cliente y límite por IP), WS `/api/connect/remoto/ws` (cliente, con clave) y WS `/api/remoto/ws` (taller, con sesión de la App Reyman y del mismo taller). El servidor solo empareja y pasa los mensajes; no guarda nada del coche.
+- Seguridad y límites: código aleatorio, clave secreta para el cliente, 5 intentos por usuario del taller en 10 min, caduca a los 10 min sin entrar, 30 min máximo, corte tras 5 min sin comunicación, un solo taller por sesión. Auditoría `remoto_inicio` / `remoto_fin` en `diag_auditoria` (quién, coche, IPs, duración, nº de comandos y de borrados). El borrado de averías sigue registrándose antes de enviarse, como siempre.
+- Connect: pantalla encendida durante la sesión (`@capacitor-community/keep-awake`), el cliente ve «José está revisando tu coche · Ahora: leyendo averías…», aviso si se borran averías y botón «Terminar ahora». Hay que recompilar Connect (plugin nuevo).
+- Probado de punta a punta: pruebas `test/remoto.test.js` (simulador ↔ servidor ↔ Reyman Diag) y la pantalla de Reyman Diag en el navegador con un cliente simulado.
+
 ### Pruebas
-- **133 pruebas automáticas.**
+- **141 pruebas automáticas.**
 
 ## Pendiente
 

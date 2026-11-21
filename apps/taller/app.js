@@ -9,6 +9,7 @@ import { crearTransporteWifi, WIFI_POR_DEFECTO } from '@reyman/obd-core/transpor
 import { crearTransporteJ2534 } from '@reyman/obd-core/transport/j2534.js';
 import { crearTransporteBleNativo } from '@reyman/obd-core/transport/ble-nativo.js';
 import { crearTransporteWifiNativo } from '@reyman/obd-core/transport/wifi-nativo.js';
+import { crearTransporteRemoto } from '@reyman/obd-core/transport/remoto.js';
 import { crearClienteWican, pedirPorEnlace, pedirNativo, revisarAjustes, textoWican } from '@reyman/obd-core/wican.js';
 import { escanearCentralitas, leerTodasLasCentralitas, leerCentralita, borrarCentralita } from '@reyman/obd-core/obd/uds.js';
 import { decodificarVin } from '@reyman/obd-core/obd/vin.js';
@@ -24,7 +25,7 @@ import { desdeSesion, abrirTexto, estadisticas, valorEn, duracion, frecuencia, t
 // y todo queda en el registro descargable para revisarlo.
 const PRUEBAS = window.REYMAN_DIAG_PRUEBAS === true;
 const DEMO = PRUEBAS || window.REYMAN_DIAG_DEMO === true || new URLSearchParams(location.search).has('demo');
-const VERSION = '0.4.15';
+const VERSION = '0.4.16';
 const api = crearApi({ demo: DEMO });
 // App instalada (iPad, iPhone, Android): la web se abre dentro de la app y tiene Bluetooth y Wi-Fi directos con el
 // adaptador, sin el portátil. Los plugins vienen empaquetados en lib/nativo.js (scripts/build-nativo.js).
@@ -190,6 +191,7 @@ function vConectar() {
       <button class="opcion" data-con="wifi" ${wifi ? '' : 'disabled'}>${I.wifi}<strong>Wi-Fi</strong><span>${NATIVA ? `WiCAN Pro u otro adaptador Wi-Fi, directo desde este dispositivo. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : conPuente() ? `Adaptador Wi-Fi o WiCAN Pro desde el portátil, con el programa de enlace abierto. ${esc(cfgWifi().host)}:${esc(cfgWifi().puerto)}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       ${NATIVA ? '' : `<button class="opcion" data-con="j2534" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Autel V200 (J2534)</strong><span>${conPuente() ? 'MaxiVCI V200 por USB desde el portátil, con el programa de enlace abierto. Lee todas las centralitas.' : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>
       <button class="opcion" data-con="vcmi" ${conPuente() ? '' : 'disabled'}>${I.usb}<strong>Otra interfaz Autel (VCMI…)</strong><span>${conPuente() ? `VCMI u otra interfaz J2534 instalada en el portátil.${otraJ2534() ? ` Última: ${esc(otraJ2534())}.` : ''}` : 'Abre «Iniciar Reyman Diag» en este ordenador (portátil con Windows) y espera unos segundos.'}</span></button>`}
+      ${DEMO ? '' : `<button class="opcion" data-con="remoto">${I.wifi}<strong>Remoto (app del cliente)</strong><span>El cliente conecta su adaptador con Reyman Connect, pulsa «Permitir al taller» y te dice el código de 6 cifras.</span></button>`}
       <button class="opcion" data-con="sim">${I.sim}<strong>Simulador</strong><span>Coche de prueba para aprender a usar la app sin adaptador.</span></button>
       <button class="opcion" data-con="consulta">${I.carpeta}<strong>Consultar lecturas guardadas</strong><span>Sin conectar al coche, por matrícula. Para la oficina.</span></button>
       <button class="opcion" data-con="grabaciones">${I.vivo}<strong>Ver datos grabados</strong><span>Pruebas de carretera guardadas o un archivo CSV/JSON (grabador, otros equipos). Sin conectar.</span></button>
@@ -208,6 +210,7 @@ function vConectar() {
     if (b.dataset.con === 'wifi') return dialogoWifi();
     if (b.dataset.con === 'j2534') return conectar('j2534', 'V200');
     if (b.dataset.con === 'vcmi') return dialogoOtraJ2534();
+    if (b.dataset.con === 'remoto') return dialogoRemoto();
     conectar(b.dataset.con);
   }));
   if (estado.conectado) {
@@ -650,6 +653,22 @@ async function averiasDesdeWican(caja) {
     caja.innerHTML = `<div class="aviso">${esc(e.message)}</div>`;
   }
 }
+// Diagnóstico remoto: el cliente tiene el adaptador en su coche y la app Reyman Connect abierta; nos dice el código
+function dialogoRemoto() {
+  const d = dialogo(`<h3>Diagnóstico remoto</h3>
+    <p class="suave">Pide al cliente que enchufe el adaptador, ponga el contacto y en Reyman Connect pulse <strong>Diagnóstico → «Permitir al taller»</strong>. Le saldrá un código de 6 cifras.</p>
+    <div class="campo"><label for="r-codigo">Código del cliente</label><input id="r-codigo" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="123456"></div>
+    <p class="peq suave">Todo queda registrado (quién, cuándo y qué coche). Para borrar averías, el motor tiene que estar parado y el contacto puesto.</p>
+    <div class="fila-btn"><button class="btn fantasma" value="cancel" formmethod="dialog">Cancelar</button><button class="btn" id="r-ok">Conectar</button></div>`);
+  $('#r-ok', d).onclick = (e) => {
+    e.preventDefault();
+    const codigo = $('#r-codigo', d).value.replace(/\D/g, '');
+    if (codigo.length !== 6) { toast('El código tiene 6 cifras.'); return; }
+    d.close();
+    conectar('remoto', codigo);
+  };
+}
+
 function dialogoWifi() {
   const c = cfgWifi();
   const d = dialogo(`<h3>Adaptador Wi-Fi</h3><p class="suave">${NATIVA ? 'El adaptador y este dispositivo tienen que estar en la misma red Wi-Fi: la del propio adaptador (WiCAN…) o la del taller si el adaptador está conectado a ella.' : 'Conecta el portátil a la red Wi-Fi del adaptador (WiFi_OBDII, WiCAN… ) y deja abierta la ventana del programa de enlace.'}</p>
@@ -701,14 +720,21 @@ async function conectar(tipo, coche) {
         if (grave) throw new Error(grave.texto);
       }
     }
-    paso('Buscando el adaptador…');
-    if (NATIVA && tipo === 'ble') estado.transporte = crearTransporteBleNativo({ BleClient: (await nativo()).BleClient });
+    paso(tipo === 'remoto' ? 'Conectando con el móvil del cliente…' : 'Buscando el adaptador…');
+    if (tipo === 'remoto') estado.transporte = crearTransporteRemoto({ url: `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/remoto/ws?codigo=${encodeURIComponent(coche)}` });
+    else if (NATIVA && tipo === 'ble') estado.transporte = crearTransporteBleNativo({ BleClient: (await nativo()).BleClient });
     else if (NATIVA && tipo === 'wifi') estado.transporte = crearTransporteWifiNativo({ TcpSocket: (await nativo()).TcpSocket, ...cfgWifi() });
     else estado.transporte = tipo === 'ble' ? crearTransporteBle() : tipo === 'serie' ? crearTransporteSerie() : tipo === 'wifi' ? crearTransporteWifi(cfgWifi()) : tipo === 'j2534' ? crearTransporteJ2534({ puente: `ws://localhost:35001/j2534${coche ? `?dll=${encodeURIComponent(coche)}` : ''}`, log: (t) => log('j2534', t) }) : crearSimulador({ coche, escaneo: true });
     await estado.transporte.conectar();
     if (estado.wican?.info) estado.transporte.nombre = `${textoWican(estado.wican.info)} · Wi-Fi`;
-    estado.transporte.alDesconectarse(() => { estado.conectado = false; estadoBarra('Adaptador desconectado'); toast('Se ha perdido la conexión con el adaptador.'); });
-    estado.elm = new Elm327(estado.transporte, { log, timeoutMs: tipo === 'j2534' ? 20000 : undefined });
+    estado.transporte.alDesconectarse((motivo) => { estado.conectado = false; estadoBarra('Adaptador desconectado'); toast(typeof motivo === 'string' ? motivo : 'Se ha perdido la conexión con el adaptador.'); });
+    if (tipo === 'remoto') {
+      const c = estado.transporte.cliente || {};
+      log('·', `Diagnóstico remoto con ${c.nombre || 'el cliente'}${c.matricula ? ` · ${c.matricula}` : ''}${c.adaptador ? ` · ${c.adaptador}` : ''}`);
+      toast(`Conectado al coche de ${c.nombre || 'el cliente'}${c.matricula ? ` (${c.matricula})` : ''}.`);
+    }
+    // Remoto: cada petición va y vuelve por Internet, se espera más que con el adaptador en la mano
+    estado.elm = new Elm327(estado.transporte, { log, timeoutMs: tipo === 'j2534' ? 20000 : tipo === 'remoto' ? 12000 : undefined });
     estado.uds = null; estado.modo06 = null; estado.modo09 = null; estado.bateriaHv = null;
     if (estado.hvVivo) { clearInterval(estado.hvVivo); estado.hvVivo = null; }
     paso('Comunicando con el coche…');

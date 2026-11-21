@@ -37,7 +37,7 @@ const VISTAS = {
 };
 
 /** Pestaña que se marca abajo para cada pantalla. */
-const pestanaDe = (v) => (esPestana(v) ? v : ['averias', 'bateria', 'mant'].includes(v) ? 'diag' : st.historia.find(esPestana) || 'inicio');
+const pestanaDe = (v) => (esPestana(v) ? v : ['averias', 'bateria', 'mant', 'remoto'].includes(v) ? 'diag' : st.historia.find(esPestana) || 'inicio');
 
 function pintar() {
   const raiz = document.getElementById('app');

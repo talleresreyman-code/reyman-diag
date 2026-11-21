@@ -137,6 +137,36 @@ export async function prediagnostico(cuerpo, { demo = false } = {}) {
   return j;
 }
 
+// --- Diagnóstico remoto con el taller (servidor de Reyman Diag) ---
+export const DIAG = globalThis.REYMAN_CONNECT_API || 'https://diag.talleresreyman.es';
+
+/** Pide un código de 6 cifras para que el taller se conecte: { codigo, clave, caduca, taller }. */
+export async function abrirRemoto(cuerpo) {
+  await plugins();
+  const url = `${DIAG}/api/connect/remoto/abrir`;
+  let j;
+  try {
+    if (http) { const r = await http.post({ url, headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, data: cuerpo, connectTimeout: 15000, readTimeout: 20000 }); j = typeof r.data === 'string' ? JSON.parse(r.data) : r.data; }
+    else j = await (await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) })).json();
+  } catch {
+    throw new Error('No se ha podido contactar con el taller. Revisa que el móvil tenga Internet (datos móviles).');
+  }
+  if (!j?.codigo) throw new Error(j?.error || 'No se ha podido preparar la conexión con el taller.');
+  return j;
+}
+
+export const urlRemotoWs = (codigo, clave) => `${DIAG.replace(/^http/, 'ws')}/api/connect/remoto/ws?codigo=${encodeURIComponent(codigo)}&clave=${encodeURIComponent(clave)}`;
+
+// Pantalla encendida mientras dura la sesión remota (si se bloquea, el móvil corta la conexión)
+let despierto;
+export async function mantenerPantalla(si) {
+  if (!esNativa()) return;
+  try {
+    if (despierto === undefined) despierto = (await import('@capacitor-community/keep-awake')).KeepAwake || null;
+    if (despierto) await (si ? despierto.keepAwake() : despierto.allowSleep());
+  } catch { /* opcional */ }
+}
+
 /** Foto (archivo del móvil) reducida a JPEG en base64 para enviarla (el servicio admite hasta 2 MB). */
 export function fotoReducida(archivo, lado = 1280) {
   return new Promise((ok, mal) => {
