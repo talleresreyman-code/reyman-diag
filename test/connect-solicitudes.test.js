@@ -39,6 +39,10 @@ test('Connect · mantenimiento: valida y escribe el mensaje de WhatsApp', () => 
   assert.match(validar(s, coches), /cerrados/); // sábado
   s.dia = '2026-11-27';
   s.sustitucion = true;
+  assert.equal(validar(s, coches), 'Dinos cuándo necesitas recoger el coche.');
+  s.recogida = 'hora'; s.horaRecogida = '15:30';
+  assert.match(validar(s, coches), /fuera de nuestro horario/); // viernes hasta las 15:00
+  s.horaRecogida = '14:30';
   assert.equal(validar(s, coches), null);
   const m = construirMensaje(s, { coches, cliente: 'José', fecha: FECHA });
   assert.match(m, /^Hola, soy José\. Os escribo desde la app Reyman Connect\./);
@@ -46,7 +50,8 @@ test('Connect · mantenimiento: valida y escribe el mensaje de WhatsApp', () => 
   assert.match(m, /Seat León 1\.5 Tsi · 1234KLM · 84\.320 km en la última visita/);
   assert.match(m, /Revisión \/ cambio de aceite, Neumáticos/);
   assert.match(m, /Neumáticos: medida 205\/55 R16 91V · 2 ruedas · gama calidad/);
-  assert.match(m, /El viernes 27\/11\/2026 · dejo el coche/);
+  assert.match(m, /El viernes 27\/11\/2026/);
+  assert.match(m, /Recogida: necesito el coche a las 14:30/);
   assert.match(m, /coche de sustitución/);
   assert.match(m, /Ref\. RC-261121-1043$/);
   assert.ok(urlWhatsApp(m).startsWith('https://wa.me/34665942470?text=Hola%2C%20soy'));
@@ -58,6 +63,8 @@ test('Connect · avería con testigo, códigos del adaptador y sin poder circula
   assert.equal(validar(s, coches), 'Marca qué notas o cuéntanoslo.');
   s.sel = ['testigo', 'potencia']; s.testigos = ['motor']; s.pasa = ['acelerar', 'caliente']; s.desde = 'dias'; s.circular = 'no'; s.km = '84.900';
   s.texto = 'Al subir cuestas';
+  assert.equal(validar(s, coches), 'Dinos cuándo te viene bien.');
+  s.cuando = 'pronto';
   assert.equal(validar(s, coches), null);
   const m = construirMensaje(s, { coches, codigos: ['P0299'], fecha: FECHA });
   assert.match(m, /^Hola, os escribo/);

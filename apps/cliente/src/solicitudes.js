@@ -62,7 +62,7 @@ export const ADMIN = [
 ];
 
 export const CUANDO = [['pronto', 'Lo antes posible'], ['semana', 'Esta semana'], ['proxima', 'La semana que viene'], ['dia', 'Un día concreto']];
-export const ESPERA = [['deja', 'Dejo el coche'], ['espera', 'Espero en el taller']];
+export const RECOGIDA = [['listo', 'Cuando esté listo'], ['hora', 'Necesito una hora concreta']];
 
 const nombre = (lista, id) => lista.find(([k]) => k === id)?.[1] || id;
 const nombres = (lista, ids) => (ids || []).map((id) => nombre(lista, id));
@@ -73,7 +73,7 @@ export function nuevaSolicitud(tipo, { coche = null, sel = [] } = {}) {
     tipo, coche, otro: { marca: '', modelo: '', matricula: '', km: '', anio: '' }, km: '',
     sel: [...sel], testigos: [], pasa: [], desde: null, circular: null, codigos: true,
     neumaticos: { medida: '', cantidad: '', gama: null },
-    plazo: null, sobre: null, cuando: null, dia: '', espera: 'deja', sustitucion: false, texto: '',
+    plazo: null, sobre: null, cuando: null, dia: '', recogida: null, horaRecogida: '', sustitucion: false, texto: '',
   };
 }
 
@@ -85,7 +85,7 @@ export function cochesDisponibles(datos) {
     const m = limpiaMatricula(v.matricula);
     if (!m || vistos.has(m)) continue;
     vistos.add(m);
-    out.push({ id: m, matricula: m, marca: v.marca || '', modelo: v.modelo || '', nombre: [v.marca, v.modelo].filter(Boolean).join(' '), km: Number(v.km) > 0 ? Number(v.km) : null, origen: 'taller', itv: v.proxima_itv || v.itv_cliente || '', enTaller: enTaller(v) });
+    out.push({ id: m, matricula: m, marca: v.marca || '', modelo: v.modelo || '', motor: v.motor || '', nombre: [v.marca, v.modelo].filter(Boolean).join(' '), km: Number(v.km) > 0 ? Number(v.km) : null, origen: 'taller', itv: v.proxima_itv || v.itv_cliente || '', enTaller: enTaller(v) });
   }
   const loc = datos?.vehiculo;
   const mLoc = limpiaMatricula(loc?.matricula);
@@ -149,7 +149,7 @@ export function cocheDe(sol, coches) {
 export const necesitaCoche = (sol) => sol.tipo !== 'admin' && !(sol.tipo === 'consulta' && sol.sobre !== 'mio');
 
 /** Devuelve el primer problema que impide enviar (texto para el cliente) o null. */
-export function validar(sol, coches = []) {
+export function validar(sol, coches = [], { sinCita = false } = {}) {
   if (necesitaCoche(sol)) {
     if (!sol.coche) return 'Elige el coche.';
     const c = cocheDe(sol, coches);
@@ -168,11 +168,29 @@ export function validar(sol, coches = []) {
     if (!sol.texto.trim()) return 'Escribe tu consulta.';
   }
   if (sol.tipo === 'admin' && !sol.sel.length) return 'Marca de qué se trata.';
-  if (pideCita(sol) && sol.cuando === 'dia') {
-    if (!sol.dia) return 'Elige el día.';
-    if (esDiaCerrado(sol.dia)) return 'Sábados y domingos estamos cerrados: elige otro día.';
+  if (pideCita(sol) && !sinCita) {
+    if (!sol.cuando) return 'Dinos cuándo te viene bien.';
+    if (sol.cuando === 'dia') {
+      if (!sol.dia) return 'Elige el día.';
+      if (esDiaCerrado(sol.dia)) return 'Sábados y domingos estamos cerrados: elige otro día.';
+    }
+    if (sol.tipo === 'mant') {
+      if (!sol.recogida) return 'Dinos cuándo necesitas recoger el coche.';
+      if (sol.recogida === 'hora' && !/^\d{2}:\d{2}$/.test(sol.horaRecogida || '')) return 'Indica la hora a la que necesitas recogerlo.';
+      if (sol.recogida === 'hora' && !horaValida(sol.horaRecogida, sol.dia)) return 'Esa hora está fuera de nuestro horario (lunes a jueves hasta las 16:00, viernes hasta las 15:00).';
+    }
   }
+  if (sol.tipo === 'admin' && sol.sel.includes('otro') && !sol.texto.trim()) return 'Cuéntanos de qué se trata.';
   return null;
+}
+
+/** Hora de recogida dentro del horario (8:00 a 16:00; viernes hasta las 15:00). */
+export function horaValida(hhmm, diaIso = '') {
+  const m = String(hhmm || '').match(/^(\d{2}):(\d{2})$/);
+  if (!m) return false;
+  const min = Number(m[1]) * 60 + Number(m[2]);
+  const viernes = leerFecha(diaIso)?.getDay() === 5;
+  return min >= 8 * 60 && min <= (viernes ? 15 : 16) * 60;
 }
 
 /** La solicitud pide día de entrada (mantenimiento, avería o presupuesto que quiere hacer). */
@@ -234,7 +252,8 @@ export function construirMensaje(sol, { coches = [], cliente = '', codigos = [],
 
   if (pideCita(sol) && sol.cuando) {
     const cuando = sol.cuando === 'dia' && sol.dia ? `El ${diaSemana(sol.dia)} ${fechaES(sol.dia)}` : nombre(CUANDO, sol.cuando);
-    L.push(`📅 ${cuando}${sol.tipo === 'mant' ? ` · ${nombre(ESPERA, sol.espera).toLowerCase()}` : ''}`);
+    L.push(`📅 ${cuando}`);
+    if (sol.tipo === 'mant' && sol.recogida) L.push(`🕓 Recogida: ${sol.recogida === 'hora' && sol.horaRecogida ? `necesito el coche a las ${sol.horaRecogida}` : 'cuando esté listo'}`);
     if (sol.sustitucion) L.push('🚙 Necesitaría coche de sustitución');
   }
 
@@ -301,7 +320,7 @@ export function sintomaPrincipal(sol) {
 
 /** Qué falta para pedir el prediagnóstico (texto para el cliente) o null. */
 export function validarPrediagnostico(sol, coches, { nombre: n = '', telefono = '' } = {}) {
-  const e = validar(sol, coches);
+  const e = validar(sol, coches, { sinCita: true });
   if (e) return e;
   const c = cocheDe(sol, coches);
   if (!c?.matricula && !c?.marca && !c?.nombre) return 'Dinos la matrícula o la marca del coche.';
@@ -330,4 +349,19 @@ export function cuerpoReymanOnline(sol, { coches = [], nombre: n = '', telefono 
     ...(foto ? { foto } : {}),
     contacto: 'Desde la app Reyman Connect', rgpd: !!sol.rgpd, acepto: !!sol.acepto, web: '', origen: 'reyman-connect',
   };
+}
+
+/** ¿Está abierto el taller? Lunes a jueves de 8:00 a 16:00 y viernes de 8:00 a 15:00 (los festivos no se tienen en cuenta). */
+export function estadoTaller(f = new Date()) {
+  const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const cierre = (d) => (d === 5 ? 15 : d >= 1 && d <= 4 ? 16 : null);
+  const d = f.getDay(); const min = f.getHours() * 60 + f.getMinutes();
+  const c = cierre(d);
+  if (c && min >= 480 && min < c * 60) return { abierto: true, texto: `Abierto ahora · hasta las ${c}:00` };
+  if (c && min < 480) return { abierto: false, texto: 'Cerrado · abrimos hoy a las 8:00' };
+  for (let i = 1; i <= 7; i++) {
+    const dd = (d + i) % 7;
+    if (cierre(dd)) return { abierto: false, texto: `Cerrado · abrimos ${i === 1 ? 'mañana' : `el ${DIAS[dd]}`} a las 8:00` };
+  }
+  return { abierto: false, texto: 'Cerrado' };
 }

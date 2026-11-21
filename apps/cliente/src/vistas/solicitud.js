@@ -4,7 +4,7 @@
 import { st, DEMO, TALLER, persistir, pintar, ir } from '../estado.js';
 import { $, esc, I, toast, abrirFuera, chips } from '../ui.js';
 import {
-  TIPOS, MANT, GAMAS, SINTOMAS, TESTIGOS, CUANDO_PASA, DESDE, CIRCULAR, PRESUPUESTO, PLAZO, SOBRE, ADMIN, CUANDO, ESPERA,
+  TIPOS, MANT, GAMAS, SINTOMAS, TESTIGOS, CUANDO_PASA, DESDE, CIRCULAR, PRESUPUESTO, PLAZO, SOBRE, ADMIN, CUANDO, RECOGIDA,
   nuevaSolicitud, cochesDisponibles, validar, construirMensaje, urlWhatsApp, pideCita, necesitaCoche, resumen, referencia,
   validarPrediagnostico, cuerpoReymanOnline, limpiaMovil,
 } from '../solicitudes.js';
@@ -112,17 +112,24 @@ function bloqueCuando(s) {
   if (!pideCita(s)) return '';
   return `<section class="panel"><h2>¿Cuándo te viene bien?</h2>${chips('cuando', CUANDO, s.cuando)}
     ${s.cuando === 'dia' ? `<label class="campo" style="margin-top:10px"><span>Día</span><input type="date" data-campo="dia" data-repintar="1" min="${manana()}" value="${esc(s.dia)}"></label>` : ''}
-    ${s.tipo === 'mant' ? `<p class="peq" style="margin-top:10px">¿Dejas el coche o esperas?</p>${chips('espera', ESPERA, s.espera)}` : ''}
+    ${s.tipo === 'mant' ? `<p class="peq" style="margin-top:12px"><strong>¿Cuándo necesitas recogerlo?</strong></p>${chips('recogida', RECOGIDA, s.recogida)}
+      ${s.recogida === 'hora' ? `<label class="campo" style="margin-top:10px"><span>Hora de recogida (de 8:00 a 16:00; viernes hasta las 15:00)</span><input type="time" data-campo="horaRecogida" data-repintar="1" min="08:00" max="16:00" step="900" value="${esc(s.horaRecogida)}"></label>` : ''}` : ''}
     <label class="check" style="margin-top:10px"><input type="checkbox" data-campo="sustitucion" ${s.sustitucion ? 'checked' : ''}> <span>Necesitaría coche de sustitución <span class="peq suave">(según disponibilidad)</span></span></label>
     <p class="peq suave">Los coches se reciben de 8:00 a 9:30. Te confirmamos el día por WhatsApp.</p>
   </section>`;
+}
+
+/** Nombre y móvil: lo que escribió el cliente o, si no, lo de su ficha del taller. */
+function contactoConFicha() {
+  const c = st.datos.contacto || {};
+  return { nombre: c.nombre || st.datos.cliente?.nombre || '', telefono: c.telefono || st.datos.clienteDatos?.telefono || '' };
 }
 
 const SEMAFORO = { rojo: ['rojo', 'No circules'], amarillo: ['ambar', 'Revísalo pronto'], verde: ['verde', 'Sin urgencia'] };
 
 /** Prediagnóstico gratis con Reyman Online, con los datos del cliente y del coche ya puestos. */
 function bloquePrediagnostico(s) {
-  const c = st.datos.contacto || {};
+  const c = contactoConFicha();
   if (s.pre) {
     const p = s.pre;
     const [color, txt] = SEMAFORO[p.gravedad] || ['azul', ''];
@@ -141,8 +148,8 @@ function bloquePrediagnostico(s) {
     </section>`;
   }
   return `<section class="panel prediag">
-    <h2>¿Qué puede ser? · Prediagnóstico gratis</h2>
-    <p class="peq suave">Te orientamos sobre la avería y lo urgente que es en unos 20 segundos. Lo hace Reyman Online, nuestra IA, y nos llega también al taller.</p>
+    <h2>¿Qué puede ser? · Orientación al momento</h2>
+    <p class="peq suave">Con lo que has marcado, Reyman Online (nuestra IA) te orienta sobre la avería y lo urgente que es en unos 20 segundos. Sin compromiso: nos llega también al taller.</p>
     <div class="dos">
       <label class="campo"><span>Tu nombre</span><input data-campo="contacto.nombre" autocomplete="name" value="${esc(c.nombre || '')}"></label>
       <label class="campo"><span>Tu móvil</span><input data-campo="contacto.telefono" type="tel" autocomplete="tel" inputmode="tel" value="${esc(c.telefono || '')}"></label>
@@ -164,6 +171,7 @@ export function vSolicitud() {
   const codigos = s.tipo === 'averia' ? s.codigosAdaptador || [] : [];
   return `<h1>${esc(t.titulo)}</h1>
     <p class="suave">${esc(INTRO[s.tipo])}</p>
+    <div class="pasos-ayuda"><span>1</span> Rellena los apartados <span>2</span> Pulsa «Enviar por WhatsApp» <span>3</span> En WhatsApp, pulsa «Enviar»</div>
     ${bloqueCoche(s, coches)}
     ${bloqueTipo(s)}
     ${codigos.length ? `<label class="check panel"><input type="checkbox" data-campo="codigos" ${s.codigos ? 'checked' : ''}> <span>Enviar también los códigos que ha leído el adaptador: <strong>${esc(codigos.join(', '))}</strong></span></label>` : ''}
@@ -176,16 +184,22 @@ export function vSolicitud() {
     ${s.tipo === 'averia' ? bloquePrediagnostico(s) : ''}
     ${bloqueCuando(s)}
     ${s.tipo === 'averia' ? '<p class="peq suave">En WhatsApp puedes añadir un vídeo o una nota de voz con el ruido: nos ayuda mucho. La diagnosis con máquina tiene coste (orientativo, unos 60 €) y te lo confirmamos antes de hacer nada.</p>' : ''}
-    <div id="sol-error" role="alert"></div>
-    <button class="btn grande wa" id="sol-enviar">${I.wa} ${s.tipo === 'averia' || s.tipo === 'mant' ? 'Pedir cita por WhatsApp' : 'Enviar por WhatsApp'}</button>
-    <p class="peq suave centrado" style="margin-top:8px">Se abre WhatsApp con el mensaje escrito. Solo tienes que pulsar «Enviar».</p>
+    <p class="falta" id="sol-falta" aria-live="polite">${esc(faltaPara(s) || '')}</p>
+    <button class="btn grande wa" id="sol-enviar" ${faltaPara(s) ? 'disabled' : ''}>${I.wa} ${s.tipo === 'averia' || s.tipo === 'mant' ? 'Pedir cita por WhatsApp' : 'Enviar por WhatsApp'}</button>
+    <p class="peq suave centrado" style="margin-top:8px">El botón se activa cuando esté todo. Se abre WhatsApp con el mensaje escrito: solo tienes que pulsar «Enviar».</p>
     ${DEMO ? '<details class="peq"><summary>Ver el mensaje</summary><pre class="previa" id="sol-previa"></pre></details>' : ''}`;
+}
+
+/** Lo que falta para poder enviar (o null si está todo). */
+function faltaPara(s) {
+  const e = validar(s, cochesDisponibles(st.datos));
+  return e ? `Falta: ${e.charAt(0).toLowerCase()}${e.slice(1)}` : null;
 }
 
 function mensaje(s) {
   return construirMensaje(s, {
     coches: cochesDisponibles(st.datos),
-    cliente: st.datos.contacto?.nombre || s.nombre || '',
+    cliente: st.datos.contacto?.nombre || st.datos.cliente?.nombre || s.nombre || '',
     codigos: s.codigosAdaptador || [],
   });
 }
@@ -226,7 +240,11 @@ export function eSolicitud(el) {
     });
     return;
   }
-  const previa = () => { const p = $('#sol-previa', el); if (p) p.textContent = mensaje(s); };
+  const previa = () => {
+    const p = $('#sol-previa', el); if (p) p.textContent = mensaje(s);
+    const f = faltaPara(s); const b = $('#sol-enviar', el); const t = $('#sol-falta', el);
+    if (b) b.disabled = !!f; if (t) t.textContent = f || '';
+  };
   previa();
   el.querySelectorAll('[data-chips]').forEach((g) => g.addEventListener('click', (e) => {
     const b = e.target.closest('.chip');
@@ -235,14 +253,15 @@ export function eSolicitud(el) {
     const ruta = { cantidad: 'neumaticos.cantidad', gama: 'neumaticos.gama' }[nombre] || nombre;
     if (multiple) { const arr = s[ruta]; const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); } else {
       const actual = ruta.split('.').reduce((o, k) => o[k], s);
-      poner(s, ruta, actual === v && !['coche', 'sobre', 'plazo', 'cuando', 'espera'].includes(nombre) ? null : v);
+      poner(s, ruta, actual === v && !['coche', 'sobre', 'plazo', 'cuando', 'recogida'].includes(nombre) ? null : v);
     }
     if (nombre === 'sobre') s.coche = v === 'otro' ? 'otro' : v === 'mio' ? (cochesDisponibles(st.datos).length === 1 ? cochesDisponibles(st.datos)[0].id : null) : null;
     pintar();
   }));
   el.querySelectorAll('[data-campo]').forEach((i) => {
-    const ev = i.type === 'checkbox' || i.type === 'date' ? 'change' : 'input';
-    i.addEventListener(ev, () => {
+    const eventos = i.type === 'checkbox' || i.type === 'date' ? ['change'] : i.type === 'time' ? ['input', 'change'] : ['input'];
+    for (const ev of eventos) i.addEventListener(ev, () => {
+      if (i.type === 'time' && i.value === String(i.dataset.campo.split('.').reduce((o, k) => o?.[k], s) ?? '')) return;
       const ruta = i.dataset.campo;
       if (ruta.startsWith('contacto.')) { st.datos.contacto = { ...(st.datos.contacto || {}), [ruta.slice(9)]: i.value }; persistir(); } else poner(s, ruta, i.type === 'checkbox' ? i.checked : i.value);
       if (i.dataset.repintar) pintar(); else previa();
@@ -257,7 +276,7 @@ export function eSolicitud(el) {
   $('#foto-quitar', el)?.addEventListener('click', () => { s.foto = null; pintar(); });
   $('#pre-pedir', el)?.addEventListener('click', async () => {
     const coches = cochesDisponibles(st.datos);
-    const c = st.datos.contacto || {};
+    const c = contactoConFicha();
     const err = validarPrediagnostico(s, coches, c);
     if (err) { const caja = $('#pre-error', el); caja.innerHTML = `<div class="aviso rojo" style="margin-bottom:10px">${esc(err)}</div>`; caja.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     st.datos.contacto = { ...c, telefono: limpiaMovil(c.telefono) };
@@ -271,13 +290,7 @@ export function eSolicitud(el) {
   });
   $('#sol-enviar', el)?.addEventListener('click', async () => {
     const coches = cochesDisponibles(st.datos);
-    const err = validar(s, coches) || (s.tipo === 'admin' && s.sel.includes('otro') && !s.texto.trim() ? 'Cuéntanos de qué se trata.' : null);
-    if (err) {
-      const caja = $('#sol-error', el);
-      caja.innerHTML = `<div class="aviso rojo">${esc(err)}</div>`;
-      caja.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
+    if (validar(s, coches)) return previa();
     if (s.nombre && !st.datos.contacto?.nombre) st.datos.contacto = { ...(st.datos.contacto || {}), nombre: s.nombre.trim() };
     const texto = mensaje(s);
     st.datos.solicitudes = [{ fecha: new Date().toISOString(), tipo: s.tipo, resumen: resumen(s, coches), ref: referencia() }, ...(st.datos.solicitudes || [])].slice(0, 20);

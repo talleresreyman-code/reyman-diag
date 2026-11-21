@@ -25,14 +25,16 @@ if (!demo) {
   await fs.copyFile(path.join(DIR, 'src', 'index.html'), path.join(www, 'index.html'));
   await fs.writeFile(path.join(www, 'styles.css'), css);
   await fs.copyFile(path.join(DIR, 'src', 'logo.png'), path.join(www, 'logo.png'));
+  await fs.copyFile(path.join(DIR, 'src', 'logo-blanco.png'), path.join(www, 'logo-blanco.png'));
   console.log(`www/ listo (app.js ${Math.round(js.length / 1024)} KB)`);
 } else {
   const logo = (await fs.readFile(path.join(DIR, 'src', 'logo.png'))).toString('base64');
+  const logoBlanco = (await fs.readFile(path.join(DIR, 'src', 'logo-blanco.png'))).toString('base64');
   const html = `<title>Reyman Connect</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>${css}</style>
-<script>window.REYMAN_CONNECT_DEMO=true;window.REYMAN_LOGO='data:image/png;base64,${logo}';</script>
+<script>window.REYMAN_CONNECT_DEMO=true;window.REYMAN_LOGO='data:image/png;base64,${logo}';window.REYMAN_LOGO_BLANCO='data:image/png;base64,${logoBlanco}';</script>
 <div id="app"><main><p style="padding:24px">Cargando Reyman Connect…</p></main></div>
 <script>${js.replace(/<\/script/g, '<\\/script')}</script>`;
   await fs.mkdir(path.join(DIR, 'dist'), { recursive: true });

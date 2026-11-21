@@ -82,3 +82,11 @@ export const IM = {
   consulta: relleno('M11.5 2C6.81 2 3 5.81 3 10.5S6.81 19 11.5 19h.5v3c4.86-2.34 8-7 8-11.5C20 5.81 16.19 2 11.5 2zm1 14.5h-2v-2h2v2zm0-3.5h-2c0-3.25 3-3 3-5 0-1.1-.9-2-2-2s-2 .9-2 2h-2c0-2.21 1.79-4 4-4s4 1.79 4 4c0 2.5-3 2.75-3 5z'),
   admin: relleno('M18 17H6v-2h12v2zm0-4H6v-2h12v2zm0-4H6V7h12v2zM3 22l1.5-1.5L6 22l1.5-1.5L9 22l1.5-1.5L12 22l1.5-1.5L15 22l1.5-1.5L18 22l1.5-1.5L21 22V2l-1.5 1.5L18 2l-1.5 1.5L15 2l-1.5 1.5L12 2l-1.5 1.5L9 2 7.5 3.5 6 2 4.5 3.5 3 2v20z'),
 };
+
+/** Matrícula como la real: banda azul de la UE con estrellas y la «E», y los números separados de las letras. */
+export function placa(m, { grande = false } = {}) {
+  const t = String(m || '').toUpperCase().replace(/[\s-]/g, '');
+  const txt = /^\d{4}[A-Z]{3}$/.test(t) ? `${t.slice(0, 4)} ${t.slice(4)}` : String(m || '').toUpperCase();
+  const estrellas = Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * 2 * Math.PI; return `<circle cx="${(10 + 6 * Math.sin(a)).toFixed(2)}" cy="${(10 - 6 * Math.cos(a)).toFixed(2)}" r="1.05" fill="#ffcc00"/>`; }).join('');
+  return `<span class="placa${grande ? ' grande' : ''}" aria-label="Matrícula ${esc(txt)}"><span class="placa-ue"><svg viewBox="0 0 20 20" aria-hidden="true">${estrellas}</svg><b>E</b></span><span class="placa-txt">${esc(txt)}</span></span>`;
+}

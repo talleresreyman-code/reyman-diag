@@ -10,7 +10,7 @@
 
 const CLAVE = 'reyman-connect-v1';
 const CLAVE_PRIVADA = 'privado';
-export const PRIVADAS = ['cliente', 'clienteDatos', 'contacto', 'solicitudes'];
+export const PRIVADAS = ['cliente', 'clienteDatos', 'contacto', 'solicitudes', 'misCoches'];
 
 export const DATOS_INICIALES = {
   vehiculo: null, // { vin, marca, anio, matricula, alias }
@@ -30,6 +30,7 @@ export const DATOS_INICIALES = {
   clienteDatos: null, // última copia de Mi taller (vehículos, estado, documentos, presupuestos)
   contacto: null, // { nombre, telefono }
   solicitudes: [], // últimas peticiones enviadas al taller { fecha, tipo, resumen, ref }
+  misCoches: {}, // datos que apunta el cliente de cada coche (por matrícula): seguro, póliza, asistencia, notas…
 };
 
 let memoria = null;

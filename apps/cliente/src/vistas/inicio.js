@@ -3,7 +3,7 @@
 import { st, TALLER, DEMO } from '../estado.js';
 import { esc, I, IM, fmtFechaHora, nombreCorto, toast } from '../ui.js';
 import { estadoCorto, abrir, urlPresupuesto } from '../cliente.js';
-import { TIPOS, ORDEN_TIPOS, pendientes, enTaller } from '../solicitudes.js';
+import { TIPOS, ORDEN_TIPOS, pendientes, enTaller, estadoTaller } from '../solicitudes.js';
 import { mantenimiento } from './diagnostico.js';
 import { abrirSolicitud } from './solicitud.js';
 import { enlazarPegar, urlPedirEnlace, refrescarSiViejo } from './bienvenida.js';
@@ -27,14 +27,21 @@ export function tarjetaEstado(v) {
 }
 
 export function fichaTaller() {
-  return `<section class="panel taller-ficha">
-    <h2>${esc(TALLER.nombre)}</h2>
-    <p class="peq">${esc(TALLER.direccion)}</p>
-    <p class="peq suave">${esc(TALLER.horario)}</p>
-    <div class="fila-btn tres">
-      <a class="btn sec" href="https://wa.me/${esc(TALLER.whatsapp)}" target="_blank" rel="noopener">${I.wa} WhatsApp</a>
-      <a class="btn sec" href="tel:${esc(TALLER.telefono.replace(/\s/g, ''))}">${I.tel} Llamar</a>
-      <a class="btn sec" href="${esc(TALLER.mapa)}" target="_blank" rel="noopener">${I.mapa} Cómo llegar</a>
+  const e = estadoTaller();
+  return `<section class="taller-tarjeta">
+    <div class="tt-cab">
+      <img src="${esc(globalThis.REYMAN_LOGO_BLANCO || 'logo-blanco.png')}" alt="Talleres Reyman · CGA Car Service">
+      <span class="tt-estado ${e.abierto ? 'abierto' : ''}"><span class="tt-punto"></span>${esc(e.texto)}</span>
+    </div>
+    <div class="tt-cuerpo">
+      <a class="tt-fila" href="${esc(TALLER.mapa)}" target="_blank" rel="noopener"><span class="tt-ico">${I.mapa}</span><span><strong>Camino del Puente Viejo, 1D</strong><br><span class="peq suave">Frente a la C/ Ávila · 28500 Arganda del Rey</span></span></a>
+      <div class="tt-fila"><span class="tt-ico">🕗</span><span><strong>Lunes a jueves</strong> 8:00 – 16:00<br><strong>Viernes</strong> 8:00 – 15:00 <span class="peq suave">· festivos cerrado</span></span></div>
+      <a class="tt-fila" href="tel:${esc(TALLER.telefono.replace(/\s/g, ''))}"><span class="tt-ico">${I.tel}</span><span><strong>${esc(TALLER.telefono)}</strong><br><span class="peq suave">Teléfono y WhatsApp</span></span></a>
+      <div class="tt-botones">
+        <a class="btn wa" href="https://wa.me/${esc(TALLER.whatsapp)}" target="_blank" rel="noopener">${I.wa} WhatsApp</a>
+        <a class="btn" href="tel:${esc(TALLER.telefono.replace(/\s/g, ''))}">${I.tel} Llamar</a>
+        <a class="btn sec" href="${esc(TALLER.mapa)}" target="_blank" rel="noopener">${I.mapa} Cómo llegar</a>
+      </div>
     </div>
   </section>`;
 }
@@ -58,11 +65,11 @@ export function vInicio() {
     <section class="motivos">
       ${ORDEN_TIPOS.map((t) => `<button class="motivo m-${t}" data-sol="${t}"><span class="m-icono">${IM[t]}</span><span class="m-txt"><strong>${esc(TIPOS[t].titulo)}</strong><span class="peq">${esc(TIPOS[t].sub)}</span></span>${I.flecha}</button>`).join('')}
     </section>
-    ${!d.cliente ? `<section class="panel">
-      <p><strong>¿Ya eres cliente?</strong></p>
-      <p class="peq suave">Con tu enlace personal de WhatsApp verás tus coches, la reparación, presupuestos y facturas.</p>
+    ${!d.cliente ? `<details class="panel plegable">
+      <summary><strong>¿Ya eres cliente?</strong> <span class="peq suave">Añade tu ficha</span></summary>
+      <p class="peq suave" style="margin-top:8px">Con tu enlace personal de WhatsApp verás tus coches, la reparación, presupuestos y facturas.</p>
       <div class="fila-btn col"><button class="btn sec" id="b-pegar">Pegar mi enlace de WhatsApp</button><a class="btn fantasma" href="${esc(urlPedirEnlace())}" target="_blank" rel="noopener">${I.wa} Pedirlo por WhatsApp</a></div>
-    </section>` : ''}
+    </details>` : ''}
     ${sols.length ? `<section class="panel"><p class="etq">Lo último que nos has pedido</p><ul class="lista-sol">${sols.map((x) => `<li><span>${esc(x.resumen)}</span><span class="peq suave">${esc(fmtFechaHora(x.fecha))}</span></li>`).join('')}</ul></section>` : ''}
     ${fichaTaller()}`;
 }

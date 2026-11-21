@@ -98,9 +98,9 @@ export function estadoCorto(v) {
 }
 
 const DATOS_DEMO = {
-  ok: true, cliente: 'José (demostración)', prueba: true, actualizado: new Date().toISOString(),
+  ok: true, cliente: 'José (demostración)', prueba: true, telefono: '600123456', actualizado: new Date().toISOString(),
   vehiculos: [
-    { matricula: '1234KLM', marca: 'Seat', modelo: 'León 1.5 Tsi', km: '84320', ultima_visita: '12/02/2026', visitas: 6, ultimo_trabajo: 'Revisión anual', estado: { texto: 'Terminado: puedes pasar a recogerlo', extra: '', terminado: true, en_taller: true, motivo: 'Revisión anual · Cambio de escobillas', entrada: '13 de noviembre' }, en_taller: true, proxima_itv: '15/12/2026', itv_cliente: '' },
+    { matricula: '1234KLM', marca: 'Seat', modelo: 'León 1.5 Tsi', motor: 'DADA', bastidor: 'VSSZZZKLZLR012345', km_anuales: 14200, km: '84320', ultima_visita: '12/02/2026', visitas: 6, ultimo_trabajo: 'Revisión anual', estado: { texto: 'Terminado: puedes pasar a recogerlo', extra: '', terminado: true, en_taller: true, motivo: 'Revisión anual · Cambio de escobillas', entrada: '13 de noviembre' }, en_taller: true, proxima_itv: '15/12/2026', itv_cliente: '' },
     { matricula: '5678BCD', marca: 'Volkswagen', modelo: 'Golf 2.0 Tdi', km: '152300', ultima_visita: '03/10/2025', visitas: 9, ultimo_trabajo: 'Pastillas de freno delanteras', estado: { texto: 'Presupuesto enviado, pendiente de tu respuesta', en_taller: false }, en_taller: false, proxima_itv: '', itv_cliente: '' },
   ],
   documentos: [

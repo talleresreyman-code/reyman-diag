@@ -400,13 +400,52 @@ function ficha(vista, titulo, [color, valor, detalle]) {
 export const OFRECER_ADAPTADOR = false;
 
 function bloqueAdaptador() {
-  if (!OFRECER_ADAPTADOR || st.datos.lecturas.length || st.sesion) return '';
-  return `<section class="panel"><h2>¿No tienes adaptador?</h2><p class="peq suave">Pídelo aquí y recógelo en el taller: te lo dejamos configurado en tu móvil.</p>
-    <button class="btn sec ancho" data-sol="consulta" data-sel="adaptador">${I.wa} Quiero el adaptador</button></section>`;
+  if (!OFRECER_ADAPTADOR) return '';
+  return `<button class="btn sec ancho" style="margin-bottom:10px" data-sol="consulta" data-sel="adaptador">${I.wa} Quiero el adaptador: lo recojo en el taller</button>`;
+}
+
+/** Sin adaptador todavía: qué es, cómo funciona y para qué sirve (más adelante, con fotos y vídeos). */
+function vExplicacion() {
+  const v = (ico, tit, txt) => `<li><span class="vt-ico">${ico}</span><span><strong>${tit}</strong><br><span class="peq suave">${txt}</span></span></li>`;
+  return `<section class="diag-hero">
+      <p class="etq">Diagnóstico desde tu móvil</p>
+      <h1>Tu coche te habla.<br>Nosotros te lo traducimos.</h1>
+      <p>Con un pequeño adaptador enchufado en el coche, esta app lee lo mismo que la máquina del taller y te lo explica en lenguaje claro.</p>
+    </section>
+    <section class="panel">
+      <h2>¿Qué es?</h2>
+      <p class="peq">Un aparato del tamaño de una llave USB que se enchufa en la <strong>toma OBD</strong> del coche, casi siempre bajo el volante, cerca de las rodillas. Se conecta al móvil por Bluetooth o Wi-Fi. La tienen todos los gasolina desde 2001 y los diésel desde 2004.</p>
+      <div class="hueco-media">📷 Muy pronto: fotos de dónde está la toma en cada coche</div>
+    </section>
+    <section class="panel">
+      <h2>¿Cómo funciona?</h2>
+      <ol class="pasos-diag">
+        <li><strong>Enchúfalo</strong> en la toma OBD. Se puede quedar puesto.</li>
+        <li><strong>Pon el contacto</strong> y abre Reyman Connect.</li>
+        <li>Pulsa <strong>«Comprobar mi coche»</strong>: en unos segundos ves las averías, la batería y los km.</li>
+      </ol>
+      <div class="hueco-media">▶️ Muy pronto: vídeo de 1 minuto con todo el proceso</div>
+    </section>
+    <section class="panel">
+      <h2>¿Qué ganas teniéndolo?</h2>
+      <ul class="ventajas">
+        ${v('⚠️', 'Entiendes los testigos', 'Si se enciende uno, sabes qué significa y si puedes seguir circulando o tienes que parar.')}
+        ${v('🔋', 'Batería sin sorpresas', 'Mide el arranque y la carga, y te avisa antes de que te deje tirado, sobre todo en invierno.')}
+        ${v('🛠️', 'Mantenimiento al día', 'Lleva la cuenta de los kilómetros para recordarte la revisión a tiempo.')}
+        ${v('📲', 'Se lo cuentas al taller en un toque', 'Nos llegan los códigos de la avería antes de que traigas el coche: vamos al grano y ahorras tiempo.')}
+        ${v('🔒', 'Tus datos, en tu móvil', 'La app no manda nada a nadie si tú no lo pides.')}
+      </ul>
+    </section>
+    <section class="panel">
+      <p class="peq suave">${OFRECER_ADAPTADOR ? '' : 'Muy pronto podrás pedirlo y recogerlo en el taller, y te lo dejaremos configurado. '}Si ya tienes un adaptador OBD (vLinker, WiCAN, ELM327 Bluetooth…), puedes usarlo ya.</p>
+      ${bloqueAdaptador()}
+      <button class="btn ancho" id="ya-tengo">${I.bt} ${st.datos.lecturas.length || st.datos.ajustes.tengoAdaptador ? 'Volver a mi adaptador' : 'Ya tengo un adaptador: conectar'}</button>
+    </section>`;
 }
 
 export function vDiag() {
   const d = st.datos;
+  if (st.verExplicacion || (!d.lecturas.length && !st.sesion && !d.ajustes.tengoAdaptador)) return vExplicacion();
   const l = ultimaLectura();
   const veh = d.vehiculo;
   const codigos = l ? l.averias.map((a) => a.codigo) : [];
@@ -436,7 +475,6 @@ export function vDiag() {
       ${st.sesion ? '<button class="enlace centrado" id="desconectar">Desconectar el adaptador</button>' : ''}
       ${!DEMO ? `<p class="peq suave centrado">Adaptador: ${esc(textoConexion())} · <button class="enlace" id="adaptador">Cambiar</button></p>` : ''}
     </section>
-    ${bloqueAdaptador()}
     ${bloqueOcupado()}
     <section class="fichas">
       ${ficha('averias', 'Averías', fichaAv)}
@@ -445,12 +483,15 @@ export function vDiag() {
     </section>
     ${avisoLista(avisos)}
     ${codigos.length ? `<button class="btn sec ancho" id="enviar-taller">${I.wa} Contárselo al taller</button>` : ''}
+    <button class="enlace" id="ver-explicacion">¿Cómo funciona el diagnóstico desde el móvil?</button>
     ${DEMO ? `<section class="panel demo-ctl"><label for="demo-coche" class="etq">Coche simulado</label><select id="demo-coche">${Object.entries(COCHES_SIM).map(([k, c]) => `<option value="${k}" ${k === (d.demoCoche || 'diesel') ? 'selected' : ''}>${esc(c.nombre)}</option>`).join('')}</select><button class="enlace" id="demo-reset">Borrar los datos de la demostración</button></section>` : ''}`;
 }
 
 export function eDiag(el) {
+  $('#ya-tengo', el)?.addEventListener('click', async () => { st.verExplicacion = false; st.datos.ajustes.tengoAdaptador = true; await persistir(); pintar(); window.scrollTo(0, 0); });
   $('#comprobar', el)?.addEventListener('click', comprobar);
   $('#desconectar', el)?.addEventListener('click', desconectar);
+  $('#ver-explicacion', el)?.addEventListener('click', () => { st.verExplicacion = true; pintar(); window.scrollTo(0, 0); });
   el.querySelectorAll('#mat-editar').forEach((b) => b.addEventListener('click', dialogoCoche));
   $('#adaptador', el)?.addEventListener('click', dialogoAdaptador);
   $('#enviar-taller', el)?.addEventListener('click', () => abrirSolicitud('averia', { coche: cocheApp(), sel: ['testigo'] }));

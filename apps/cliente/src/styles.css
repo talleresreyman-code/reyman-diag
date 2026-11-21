@@ -213,3 +213,64 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .condiciones { justify-content: flex-start; background: linear-gradient(180deg, #143f7a 0%, #1d57a5 260px, var(--fondo) 260px); }
 .condiciones .panel h2 { font-size: 1.05rem; margin-bottom: 6px; }
 .bloqueo .btn.grande { margin-top: 0; }
+
+/* 0.6 · Ayuda del formulario y botón con lo que falta */
+.pasos-ayuda { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 0.86rem; color: var(--gris); margin: 0 0 12px; }
+.pasos-ayuda span { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--azul); color: #fff; font-weight: 700; font-size: 0.78rem; }
+.falta { min-height: 1.2em; margin: 4px 0 8px; color: var(--ambar); font-weight: 600; font-size: 0.92rem; text-align: center; }
+.btn.wa:disabled { background: #9aa6b4; opacity: 1; }
+
+/* «¿Ya eres cliente?» plegado */
+.plegable summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.plegable summary::-webkit-details-marker { display: none; }
+.plegable summary::after { content: '›'; font-size: 1.6rem; color: var(--gris); transition: transform 0.15s ease; }
+.plegable[open] summary::after { transform: rotate(90deg); }
+
+/* Tarjeta del taller */
+.taller-tarjeta { border-radius: 18px; overflow: hidden; margin: 8px 0 14px; background: var(--superficie); border: 1px solid var(--linea); box-shadow: 0 8px 24px -14px rgba(20, 50, 100, 0.45); }
+.tt-cab { position: relative; padding: 18px 16px 14px; background: linear-gradient(135deg, #2a6fc4 0%, #1d57a5 55%, #0e2f5e 100%); text-align: center; }
+.tt-cab img { width: min(260px, 72%); height: auto; display: block; margin: 0 auto 10px; }
+.tt-estado { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 99px; background: rgba(0, 0, 0, 0.22); color: #fff; font-weight: 600; font-size: 0.86rem; }
+.tt-punto { width: 9px; height: 9px; border-radius: 50%; background: #f0645d; }
+.tt-estado.abierto .tt-punto { background: #4cd98a; box-shadow: 0 0 0 3px rgba(76, 217, 138, 0.3); }
+.tt-cuerpo { padding: 6px 14px 14px; }
+.tt-fila { display: flex; gap: 12px; align-items: flex-start; padding: 12px 2px; border-bottom: 1px solid var(--linea); color: var(--texto); text-decoration: none; }
+.tt-fila:last-of-type { border-bottom: 0; }
+.tt-ico { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex: none; border-radius: 10px; background: var(--azul-fondo); color: var(--azul-hondo); font-size: 1.05rem; }
+.tt-ico svg { width: 20px; height: 20px; }
+.tt-botones { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+.tt-botones .btn { padding: 8px 4px; font-size: 0.92rem; min-height: 50px; flex-direction: column; gap: 2px; }
+.tt-botones .btn svg { width: 22px; height: 22px; }
+
+/* Matrícula española */
+.placa { display: inline-flex; align-items: stretch; height: 30px; border: 2px solid #1b1b1b; border-radius: 5px; background: #fff; overflow: hidden; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); vertical-align: middle; }
+.placa-ue { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 20px; background: #003399; color: #fff; }
+.placa-ue svg { width: 14px; height: 14px; }
+.placa-ue b { font: 700 0.62rem/1 Arial, sans-serif; }
+.placa-txt { display: flex; align-items: center; padding: 0 10px; color: #111; font-family: 'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.06em; white-space: nowrap; }
+.placa.grande { height: 40px; }
+.placa.grande .placa-ue { width: 26px; } .placa.grande .placa-ue svg { width: 18px; height: 18px; } .placa.grande .placa-ue b { font-size: 0.75rem; }
+.placa.grande .placa-txt { font-size: 1.5rem; padding: 0 12px; }
+
+/* Ficha del coche */
+.v-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+.vehiculo .v-nombre { font-size: 1.3rem; margin: 10px 0 2px; }
+.datos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin: 12px 0 4px; }
+.dato dt { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gris); font-weight: 600; }
+.dato dd { margin: 0; font-weight: 600; }
+.mono { font-family: ui-monospace, Menlo, monospace; font-size: 0.88rem; word-break: break-all; }
+.mis-datos { margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--fondo); }
+.md-cab { display: flex; justify-content: space-between; align-items: center; }
+.mis-datos .datos { margin-bottom: 10px; }
+
+/* Diagnóstico sin adaptador: explicación */
+.diag-hero { margin: 4px -12px 14px; padding: 22px 18px; color: #fff; background: linear-gradient(135deg, #2a6fc4 0%, #1d57a5 55%, #0e2f5e 100%); }
+.diag-hero .etq { color: #cfe0f7; }
+.diag-hero h1 { color: #fff; font-size: 1.7rem; margin: 6px 0 10px; }
+.diag-hero p { color: #e4edf9; margin: 0; }
+.pasos-diag { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.ventajas { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ventajas li { display: flex; gap: 12px; align-items: flex-start; }
+.vt-ico { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--azul-fondo); font-size: 1.2rem; }
+.hueco-media { margin-top: 12px; padding: 18px 12px; border: 2px dashed var(--linea); border-radius: 12px; text-align: center; color: var(--gris); font-size: 0.88rem; }
+.v-cab .insignias { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
