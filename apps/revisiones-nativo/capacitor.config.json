@@ -1,0 +1,27 @@
+{
+  "appId": "es.talleresreyman.revisiones",
+  "appName": "Revisiones",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.talleresreyman.es/revisiones/",
+    "allowNavigation": [
+      "talleresreyman.es",
+      "*.talleresreyman.es"
+    ],
+    "errorPath": "sin-conexion.html"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#1F2732",
+    "appendUserAgent": "ReymanRevisiones"
+  },
+  "android": {
+    "backgroundColor": "#1F2732",
+    "appendUserAgent": "ReymanRevisiones"
+  },
+  "plugins": {
+    "SystemBars": {
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}
