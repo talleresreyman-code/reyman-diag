@@ -203,6 +203,11 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 ### Pruebas
 - **139 pruebas automáticas.**
 
+### 27. Revisiones instalable y enlazada con la App Reyman (21/11/2026)
+- **Revisiones** (inspección visual de vehículos de Trend Cars y flotas) como app de iPhone/iPad y Android (`apps/revisiones-nativo`, `es.talleresreyman.revisiones`, nombre «Revisiones»): carcasa de Capacitor que abre app.talleresreyman.es/revisiones/ por dentro, igual que la App Reyman. Se compila con `revisiones-ios.yml` (TestFlight, mismos secretos) y `revisiones-android.yml` (APK en la rama `apk-revisiones`). Icono de la portapapeles con lupa de la web. Permisos de cámara y fotos. Sin notificaciones (los avisos van a la App Reyman).
+- **Enlace entre apps**: Revisiones abre la App Reyman con `reyman://` (botón de arriba a la derecha) y la App Reyman abre Revisiones con `reymanrev://` (pestaña Revisiones); si la otra no está instalada, se abre la web.
+- Primera vez: crear la app «Revisiones Reyman» en App Store Connect con el ID de paquete `es.talleresreyman.revisiones` y volver a lanzar «Revisiones · iOS».
+
 ## Pendiente
 
 ### Con el material (WiCAN Pro y vLinker)

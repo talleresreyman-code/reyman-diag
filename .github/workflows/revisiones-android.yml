@@ -1,0 +1,56 @@
+# Revisiones (inspección de vehículos) · compila el APK de Android en GitHub, sin Android Studio.
+# La app abre app.talleresreyman.es/revisiones por dentro: solo hay que recompilar si cambia apps/revisiones-nativo.
+name: Revisiones · Android
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/revisiones-nativo/**', '.github/workflows/revisiones-android.yml']
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/revisiones-nativo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Dependencias
+        run: npm install --no-audit --no-fund
+      - name: Proyecto Android
+        run: |
+          npx cap add android
+          node scripts/preparar-nativo.mjs android
+          npx cap sync android
+      - name: APK
+        working-directory: apps/revisiones-nativo/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Nombre con la versión
+        run: |
+          V=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "Revisiones_v${V}.apk"
+          echo "VERSION=$V" >> $GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Revisiones_v${{ env.VERSION }}_android
+          path: apps/revisiones-nativo/Revisiones_v*.apk
+          retention-days: 30
+      # Copia también en la rama «apk-revisiones» (un solo commit) para poder llevarlo a Drive sin entrar en GitHub
+      - name: Guardar en la rama apk
+        run: |
+          mkdir -p /tmp/apk && cp Revisiones_v*.apk /tmp/apk/
+          cd /tmp/apk
+          git init -q -b apk-revisiones
+          git config user.name "Revisiones CI"
+          git config user.email "ci@talleresreyman.es"
+          git add . && git commit -qm "Revisiones v${VERSION} (Android, ${GITHUB_SHA::7})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" apk-revisiones
