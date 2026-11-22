@@ -19,6 +19,7 @@ import { vInicio, eInicio } from './vistas/inicio.js';
 import { vCoches, eCoches } from './vistas/coches.js';
 import { vDocs, eDocs } from './vistas/documentos.js';
 import { VISTAS_DIAG } from './vistas/diagnostico.js';
+import { vLibro, eLibro } from './vistas/libro.js';
 import { vSolicitud, eSolicitud, abrirSolicitud } from './vistas/solicitud.js';
 
 const PESTANAS = [
@@ -33,11 +34,12 @@ const VISTAS = {
   coches: [vCoches, eCoches],
   docs: [vDocs, eDocs],
   solicitud: [vSolicitud, eSolicitud],
+  libro: [vLibro, eLibro],
   ...VISTAS_DIAG,
 };
 
 /** Pestaña que se marca abajo para cada pantalla. */
-const pestanaDe = (v) => (esPestana(v) ? v : ['averias', 'bateria', 'mant', 'remoto'].includes(v) ? 'diag' : st.historia.find(esPestana) || 'inicio');
+const pestanaDe = (v) => (esPestana(v) ? v : ['averias', 'bateria', 'mant', 'remoto'].includes(v) ? 'diag' : v === 'libro' ? 'coches' : st.historia.find(esPestana) || 'inicio');
 
 function pintar() {
   const raiz = document.getElementById('app');

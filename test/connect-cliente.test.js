@@ -24,3 +24,26 @@ test('Connect · estado corto del coche en el taller', () => {
 test('Connect · enlace del PDF', () => {
   assert.equal(urlDocumento(T, 'a b'), `https://n8n.talleresreyman.es/webhook/reyman-mitaller-doc?t=${T}&d=a%20b`);
 });
+
+test('libro de mantenimiento: próxima revisión, color y aviso en Inicio', async () => {
+  const { resumenRevision, textoRevision } = await import('../apps/cliente/src/libro.js');
+  const { pendientes } = await import('../apps/cliente/src/solicitudes.js');
+  const hoy = new Date(2026, 10, 22, 12);
+  const libro = (prevista, km = 60000, ultima = '2025-12-20') => ({ kmHoy: km, revision: { ultima: { fecha: ultima, km: 50000 }, plazoMeses: 12, plazoKm: 15000, prevista, motivo: 'tiempo' }, proximo: { fecha: prevista, km: 65000, items: ['Líquido de frenos'] } });
+  let r = resumenRevision(libro('2026-12-20'), { hoy });
+  assert.equal(r.color, 'ambar'); assert.equal(r.kmObjetivo, 65000); assert.equal(r.kmFaltan, 5000); assert.equal(r.kmEstimados, true);
+  assert.match(textoRevision(r), /^Le toca en 28 días/);
+  r = resumenRevision(libro('2027-06-20'), { hoy, kmActuales: 66000 });
+  assert.equal(r.vencida, true, 'por km ya toca aunque la fecha quede lejos'); assert.equal(r.kmEstimados, false); assert.equal(r.color, 'rojo');
+  assert.equal(textoRevision(r), 'Ya le toca por kilómetros');
+  r = resumenRevision(libro('2027-10-20', 52000, '2026-10-20'), { hoy });
+  assert.equal(r.color, 'verde'); assert.match(textoRevision(r), /^Le toca en 11 meses/);
+  assert.equal(resumenRevision(null), null);
+  assert.equal(resumenRevision({ visitas: 1 }), null, 'sin revisiones no hay próxima');
+  // Inicio: aviso de los coches a los que les toca, no si está en el taller ni si venció hace mucho
+  const datos = (v) => ({ clienteDatos: { vehiculos: [Object.assign({ matricula: '1234 KLM', marca: 'Seat', modelo: 'León' }, v)] } });
+  assert.ok(pendientes(datos({ libro: libro('2026-12-01') }), { hoy }).some((p) => p.id === 'rev-1234KLM' && p.accion.sel[0] === 'revision'));
+  assert.ok(!pendientes(datos({ libro: libro('2026-12-01'), en_taller: true }), { hoy }).some((p) => p.id === 'rev-1234KLM'));
+  assert.ok(!pendientes(datos({ libro: libro('2027-08-01', 52000, '2026-08-01') }), { hoy }).some((p) => p.id === 'rev-1234KLM'));
+  assert.ok(!pendientes(datos({ libro: libro('2025-01-01', 52000) }), { hoy }).some((p) => p.id === 'rev-1234KLM'), 'vencida hace más de 6 meses: no se insiste');
+});

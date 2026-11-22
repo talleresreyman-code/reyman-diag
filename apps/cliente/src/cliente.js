@@ -141,7 +141,25 @@ export function estadoCorto(v) {
 const DATOS_DEMO = {
   ok: true, cliente: 'José (demostración)', prueba: true, telefono: '600123456', actualizado: new Date().toISOString(),
   vehiculos: [
-    { matricula: '1234KLM', marca: 'Seat', modelo: 'León 1.5 Tsi', motor: 'DADA', bastidor: 'VSSZZZKLZLR012345', km_anuales: 14200, km: '84320', ultima_visita: '12/02/2026', visitas: 6, ultimo_trabajo: 'Revisión anual', estado: { texto: 'Terminado: puedes pasar a recogerlo', extra: '', terminado: true, en_taller: true, motivo: 'Revisión anual · Cambio de escobillas', entrada: '13 de noviembre' }, en_taller: true, proxima_itv: '15/12/2026', itv_cliente: '' },
+    { matricula: '1234KLM', marca: 'Seat', modelo: 'León 1.5 Tsi', motor: 'DADA', bastidor: 'VSSZZZKLZLR012345', km_anuales: 14200, km: '84320', ultima_visita: '12/02/2026', visitas: 6, ultimo_trabajo: 'Revisión anual', estado: { texto: 'Terminado: puedes pasar a recogerlo', extra: '', terminado: true, en_taller: true, motivo: 'Revisión anual · Cambio de escobillas', entrada: '13 de noviembre' }, en_taller: true, proxima_itv: '15/12/2026', itv_cliente: '',
+      libro: { desde: '2021-03-02', visitas: 6, servicios: 4, kmAnual: 14000, kmHoy: 87800,
+        revision: { ultima: { fecha: '2026-02-12', km: 84320, texto: 'SERV DE INSPECCION/MANTENIMIENTO 15000KM/12M' }, plazoMeses: 12, plazoKm: 15000, prevista: '2027-02-12', motivo: 'tiempo', dias: 90 },
+        proximo: { fecha: '2027-02-12', km: 99320, vencido: false, items: ['Filtro de habitáculo', 'Líquido de frenos'] },
+        estado: [
+          { k: 'aceite', n: 'Aceite y filtro', i: '🛢️', est: 'ok', fecha: '2026-02-12', km: 84320 },
+          { k: 'f_aire', n: 'Filtro de aire', i: '🌬️', est: 'ok', fecha: '2026-02-12', km: 84320 },
+          { k: 'f_hab', n: 'Filtro de habitáculo', i: '❄️', est: 'pronto', fecha: '2025-01-20', km: 70500 },
+          { k: 'liq_frenos', n: 'Líquido de frenos', i: '💧', est: 'toca', fecha: '2023-12-04', km: 56100 },
+          { k: 'pas_del', n: 'Pastillas delanteras', i: '🛑', est: 'ok', desgaste: true, fecha: '2025-01-20', km: 70500 },
+          { k: 'bujias', n: 'Bujías', i: '⚡', est: 'ok', fecha: '2025-01-20', km: 70500 },
+        ],
+        mantenimiento: [
+          { fecha: '2026-02-12', km: 84320, titulo: 'Revisión anual', etiqueta: 'Mantenimiento', servicio: true, items: [{ i: '🛢️', t: 'Aceite 5W30 · 4,5 L' }, { i: '🛢️', t: 'Filtro de aceite' }, { i: '🌬️', t: 'Filtro de aire' }, { i: '🧽', t: 'Escobillas' }] },
+          { fecha: '2025-01-20', km: 70500, titulo: 'Revisión y frenos delanteros', etiqueta: 'Mantenimiento', servicio: true, items: [{ i: '🛢️', t: 'Aceite y filtro' }, { i: '❄️', t: 'Filtro de habitáculo' }, { i: '⚡', t: 'Bujías' }, { i: '🛑', t: 'Pastillas delanteras' }] },
+          { fecha: '2023-12-04', km: 56100, titulo: 'Servicio de mantenimiento', etiqueta: 'Mantenimiento', servicio: true, items: [{ i: '🛢️', t: 'Aceite y filtro' }, { i: '💧', t: 'Líquido de frenos' }] },
+          { fecha: '2022-11-15', km: 42800, titulo: 'Neumáticos delanteros', etiqueta: 'Neumáticos', servicio: false, items: [{ i: '🛞', t: '2 neumáticos 205/55 R16' }, { i: '📐', t: 'Alineación' }] },
+        ],
+        otras: [{ fecha: '2024-06-10', km: 63000, titulo: 'Cambio de batería', trabajos: ['Batería 60 Ah'] }, { fecha: '2021-03-02', km: 28400, titulo: 'Ruido en suspensión', trabajos: ['Bieletas estabilizadora'] }] } },
     { matricula: '5678BCD', marca: 'Volkswagen', modelo: 'Golf 2.0 Tdi', km: '152300', ultima_visita: '03/10/2025', visitas: 9, ultimo_trabajo: 'Pastillas de freno delanteras', estado: { texto: 'Presupuesto enviado, pendiente de tu respuesta', en_taller: false }, en_taller: false, proxima_itv: '', itv_cliente: '' },
   ],
   documentos: [

@@ -208,6 +208,12 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 - **Enlace entre apps**: Revisiones abre la App Reyman con `reyman://` (botón de arriba a la derecha) y la App Reyman abre Revisiones con `reymanrev://` (pestaña Revisiones); si la otra no está instalada, se abre la web.
 - Primera vez: crear la app «Revisiones Reyman» en App Store Connect con el ID de paquete `es.talleresreyman.revisiones` y volver a lanzar «Revisiones · iOS».
 
+### 28. Reyman Connect 0.8.0: libro de mantenimiento (22/11/2026)
+- **App Reyman** (solo lectura, sin cambios en la base): `GET /api/ingest/libro-connect?mats=…` (solo n8n con la clave del taller, máx. 20 matrículas). Arma el libro con las OT importadas de GemiCar (`ots`, `ot_lineas`, `ot_trabajos`; sin citas futuras ni anuladas) o, si no hay, con `vehiculo_revisiones`. Sin precios ni números de OT.
+- **n8n «Área clientes · Mi taller»**: nodo «Libro de mantenimiento (App Reyman)» tras «Montar panel»; cada coche lleva `libro` (o `null` si la app no responde).
+- **Connect**: en Mis coches, acceso «Libro de mantenimiento» con la próxima revisión de un vistazo; pantalla con próxima revisión (fecha, km, barra de cuánto falta, «Pedir cita para la revisión»), cómo está cada cosa (semáforo), historial de visitas en línea de tiempo y otras reparaciones. Inicio avisa de la revisión de cada coche cuando faltan 30 días o menos (no si está en el taller ni si venció hace más de 6 meses). Con el adaptador puesto en ese coche se usan los km reales. `src/libro.js` (lógica) y `src/vistas/libro.js` (pantalla).
+- **140 pruebas automáticas** (+1 en la App Reyman).
+
 ## Pendiente
 
 ### Con el material (WiCAN Pro y vLinker)

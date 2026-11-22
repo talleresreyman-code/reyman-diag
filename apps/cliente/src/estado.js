@@ -22,6 +22,7 @@ export const st = {
   error: null,
   midiendo: null,
   vincular: null,
+  libro: null, // matrícula del libro de mantenimiento que se está mirando
   cargandoCliente: false,
   bloqueada: false, // pantalla de Face ID / huella / código
   errorBloqueo: null,

@@ -274,3 +274,28 @@ dialog::backdrop { background: rgba(10, 16, 24, 0.55); }
 .vt-ico { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; flex: none; border-radius: 12px; background: var(--azul-fondo); font-size: 1.2rem; }
 .hueco-media { margin-top: 12px; padding: 18px 12px; border: 2px dashed var(--linea); border-radius: 12px; text-align: center; color: var(--gris); font-size: 0.88rem; }
 .v-cab .insignias { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
+
+/* Libro de mantenimiento */
+.insignia.azul { background: var(--azul-fondo); color: var(--azul); }
+.libro-cab { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.libro-cab .v-nombre { margin: 0; }
+.libro-prox { border-top: 5px solid var(--verde); }
+.libro-prox.ambar { border-top-color: var(--ambar); } .libro-prox.rojo { border-top-color: var(--rojo); }
+.libro-prox.rojo .cifra-m { color: var(--rojo); }
+.libro-mini { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--linea); border-left: 6px solid var(--verde); background: var(--fondo); color: var(--texto); text-align: left; cursor: pointer; font: inherit; }
+.libro-mini.ambar { border-left-color: var(--ambar); } .libro-mini.rojo { border-left-color: var(--rojo); }
+.libro-mini span { display: flex; flex-direction: column; }
+.libro-mini::after { content: '›'; font-size: 1.6rem; color: var(--gris); }
+.piezas { list-style: none; margin: 8px 0 6px; padding: 0; display: grid; gap: 2px; }
+.pieza { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--linea); }
+.pieza:last-child { border-bottom: 0; }
+.p-ico { width: 32px; text-align: center; font-size: 1.2rem; flex: none; }
+.p-txt { flex: 1; display: flex; flex-direction: column; }
+.linea-tiempo { list-style: none; margin: 0 0 12px; padding: 0 0 0 18px; border-left: 3px solid var(--linea); }
+.lt-item { position: relative; background: var(--superficie); border: 1px solid var(--linea); border-radius: var(--radio); padding: 12px 14px; margin: 0 0 10px; }
+.lt-item::before { content: ''; position: absolute; left: -27px; top: 16px; width: 13px; height: 13px; border-radius: 50%; background: var(--azul); border: 3px solid var(--fondo); }
+.lt-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.lt-cab .insignia { margin-left: auto; }
+.lt-tit { margin: 6px 0 0; font-weight: 600; }
+.lt-items { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 3px; font-size: 0.92rem; }
+.otras { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }

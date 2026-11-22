@@ -14,6 +14,8 @@
 //
 // Este módulo es lógica pura (sin pantalla), para poder probarlo.
 
+import { resumenRevision, textoRevision } from './libro.js';
+
 export const WHATSAPP_TALLER = '34665942470';
 
 export const TIPOS = {
@@ -293,6 +295,15 @@ export function pendientes(datos, { hoy = new Date(), revision = null } = {}) {
       titulo: d < 0 ? `La ITV del ${c.matricula || c.nombre} está caducada` : d === 0 ? `La ITV del ${c.matricula || c.nombre} caduca hoy` : `La ITV del ${c.matricula || c.nombre} caduca en ${d} ${d === 1 ? 'día' : 'días'}`,
       detalle: `${c.itv}. Te la pasamos nosotros, con pre-ITV.`, accion: { tipo: 'solicitud', sol: 'mant', coche: c.id, sel: ['preitv', 'itv'] }, boton: 'Pedir cita',
     });
+  }
+  // revisión de cada coche según su libro de mantenimiento del taller (si no está ya en el taller)
+  for (const v of cd?.vehiculos || []) {
+    if (!v.libro || enTaller(v)) continue;
+    const rv = resumenRevision(v.libro, { hoy });
+    if (!rv || rv.dias === null || rv.dias > 30 || rv.dias < -180) continue;
+    const m = limpiaMatricula(v.matricula);
+    out.push({ id: `rev-${m}`, color: rv.vencida ? 'rojo' : 'ambar', titulo: rv.vencida ? `Le toca la revisión al ${m}` : `Se acerca la revisión del ${m}`,
+      detalle: [[v.marca, v.modelo].filter(Boolean).join(' '), textoRevision(rv)].filter(Boolean).join(' · '), accion: { tipo: 'solicitud', sol: 'mant', coche: m, sel: ['revision'] }, boton: 'Pedir cita' });
   }
   if (revision && ['pronto', 'vencida'].includes(revision.estado)) {
     const c = cochesDisponibles(datos).find((x) => x.origen === 'app');

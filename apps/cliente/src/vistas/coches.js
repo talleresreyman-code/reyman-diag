@@ -5,6 +5,8 @@ import { $, esc, I, fmtKm, placa, dialogo, toast } from '../ui.js';
 import { estadoCorto } from '../cliente.js';
 import { cochesDisponibles, diasHasta, limpiaMatricula, enTaller, leerFecha } from '../solicitudes.js';
 import { enlazarPegar, urlPedirEnlace, refrescarSiViejo } from './bienvenida.js';
+import { resumenRevision, textoRevision } from '../libro.js';
+import { kmReales } from './libro.js';
 
 const fechaCorta = (iso) => { const f = leerFecha(iso); return f ? f.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; };
 
@@ -42,6 +44,14 @@ function botones(m, conDocs, nDocs) {
   </div>`;
 }
 
+/** Acceso al libro de mantenimiento con la próxima revisión de un vistazo. */
+function libroMini(v, m) {
+  if (!v.libro) return '';
+  const rv = resumenRevision(v.libro, { kmActuales: kmReales(m) });
+  const t = rv ? textoRevision(rv) : '';
+  return `<button class="libro-mini ${rv ? rv.color : ''}" data-libro="${esc(m)}"><span><strong>Libro de mantenimiento</strong><span class="peq suave">${t ? `Revisión: ${esc(t.charAt(0).toLowerCase() + t.slice(1))}` : `${Number(v.libro.visitas) || 0} visitas al taller`}</span></span></button>`;
+}
+
 export function vCoches() {
   const d = st.datos;
   const vs = d.clienteDatos?.vehiculos || [];
@@ -70,6 +80,7 @@ export function vCoches() {
           ${fila('Bastidor', v.bastidor ? `<span class="mono">${esc(v.bastidor)}</span>` : '')}
           ${fila('Visitas al taller', Number(v.visitas) > 0 ? esc(String(v.visitas)) : '')}
         </dl>
+        ${libroMini(v, m)}
         ${misDatos(m)}
         ${botones(m, true, nDocs)}
       </section>`;
@@ -111,6 +122,7 @@ function editar(m) {
 export function eCoches(el) {
   enlazarPegar(el);
   el.querySelectorAll('[data-docs]').forEach((b) => b.addEventListener('click', () => { st.filtroDocs = { matricula: b.dataset.docs, tipo: null }; ir('docs'); }));
+  el.querySelectorAll('[data-libro]').forEach((b) => b.addEventListener('click', () => { st.libro = b.dataset.libro; ir('libro'); }));
   el.querySelectorAll('[data-editar]').forEach((b) => b.addEventListener('click', () => editar(b.dataset.editar)));
   refrescarSiViejo();
 }
