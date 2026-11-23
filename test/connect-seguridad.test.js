@@ -74,3 +74,12 @@ test('Connect · la clave del móvil va en cabecera, nunca en la dirección', as
   assert.equal(nombreDispositivo('Mozilla (iPhone; CPU iPhone OS 18)'), 'iPhone');
   assert.equal(nombreDispositivo('Linux; Android 15'), 'Android');
 });
+
+test('Connect · huella del enlace: igual para el mismo enlace, distinta para otro, sin guardar el enlace', async () => {
+  const { huellaEnlace } = await import('../apps/cliente/src/cliente.js');
+  const a = await huellaEnlace('AbCdEf0123456789AbCdEf0123');
+  assert.equal(a, await huellaEnlace('AbCdEf0123456789AbCdEf0123'));
+  assert.notEqual(a, await huellaEnlace('ZbCdEf0123456789AbCdEf0123'));
+  assert.ok(!a.includes('AbCdEf0123456789'));
+  assert.equal(a.length, 64);
+});

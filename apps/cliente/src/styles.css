@@ -29,6 +29,8 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; }
+/* Sin zoom con doble toque ni al pellizcar sin querer (botones y tarjetas) */
+html, body, button, a, input, select, textarea, label, [role="button"] { touch-action: manipulation; }
 body { font-family: var(--fuente); font-size: 17px; line-height: 1.45; color: var(--texto); background: var(--fondo); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }

@@ -79,6 +79,15 @@ export async function pedirDatos(cred, { demo = false } = {}) {
   return j;
 }
 
+/** Huella (SHA-256) del enlace con el que se añadió la ficha: para reconocerlo si se vuelve a abrir, sin guardar el enlace. */
+export async function huellaEnlace(token) {
+  const t = String(token || '');
+  try {
+    const b = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+    return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+  } catch { return t ? `sin-cifrar:${t.length}:${t.slice(-6)}` : ''; }
+}
+
 /** Nombre corto del móvil para que el cliente lo reconozca en el aviso («iPhone», «Android»…). */
 export function nombreDispositivo(ua = globalThis.navigator?.userAgent || '') {
   if (/iPad/i.test(ua)) return 'iPad';
@@ -90,7 +99,7 @@ export function nombreDispositivo(ua = globalThis.navigator?.userAgent || '') {
 /** Cambia el enlace de WhatsApp por una clave propia de este móvil (el servidor avisa al cliente por WhatsApp). */
 export async function vincularMovil(token, { demo = false } = {}) {
   if (demo) { await new Promise((r) => setTimeout(r, 400)); return 'DemoClaveDeMovil0123456789abcdefghijklmnopqrstuv'; }
-  const j = await pedir(`${N8N}/reyman-connect-vincular`, { metodo: 'POST', cuerpo: { t: token, dispositivo: `Reyman Connect · ${nombreDispositivo()}` } });
+  const j = await pedir(`${N8N}/reyman-connect-vincular`, { metodo: 'POST', cuerpo: { t: token, dispositivo: `Reyman Connect (${nombreDispositivo()})` } });
   if (!j?.ok || !RE_CLAVE.test(j.clave || '')) throw errorServidor(j, 'No se ha podido añadir tu ficha a este móvil.');
   return j.clave;
 }

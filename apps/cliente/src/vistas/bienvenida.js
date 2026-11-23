@@ -2,7 +2,7 @@
 
 import { st, DEMO, TALLER, persistir, pintar } from '../estado.js';
 import { $, esc, I, toast, nombreCorto } from '../ui.js';
-import { tokenDeTexto, pedirDatos, leerPortapapeles, vincularMovil, credDe } from '../cliente.js';
+import { tokenDeTexto, pedirDatos, leerPortapapeles, vincularMovil, credDe, huellaEnlace } from '../cliente.js';
 import { borrarFicha } from '../almacen.js';
 import { proteccionDisponible, verificar, accesoRevocado } from '../seguridad.js';
 import { urlWhatsApp } from '../solicitudes.js';
@@ -56,11 +56,25 @@ export function enlazarPegar(el) {
 }
 
 export async function prepararVinculo(token) {
+  const c = st.datos.cliente;
+  // Se ha vuelto a abrir el mismo enlace (desde WhatsApp o al arrancar): la ficha ya está, no se pide nada
+  if (c?.clave && c.enlace && c.enlace === await huellaEnlace(token)) return;
   st.vincular = { token, cargando: true };
   pintar();
   try {
-    st.vincular = { token, datos: await pedirDatos(token, { demo: DEMO }) };
+    const datos = await pedirDatos(token, { demo: DEMO });
+    // Un enlace nuevo de la misma persona, con la ficha ya en este móvil: tampoco hace falta volver a añadirla
+    if (c?.clave && datos?.cliente && datos.cliente === c.nombre) {
+      st.vincular = null;
+      c.enlace = await huellaEnlace(token);
+      await persistir();
+      toast('Tu ficha ya está en esta app.');
+      return pintar();
+    }
+    st.vincular = { token, datos };
   } catch (e) {
+    // Con la ficha ya guardada, un enlace viejo o caducado no molesta: se sigue con la ficha de siempre
+    if (c?.clave) { st.vincular = null; return pintar(); }
     st.vincular = { token, error: e.message };
   }
   pintar();
@@ -89,7 +103,7 @@ async function confirmarVinculo() {
   const d = st.datos;
   if (d.cliente && d.cliente.nombre !== (datos.cliente || '')) await borrarFicha(d); // ficha de otra persona: fuera
   const ahora = new Date().toISOString();
-  d.cliente = { clave, nombre: datos.cliente || '', desde: ahora, ultimoUso: ahora };
+  d.cliente = { clave, enlace: await huellaEnlace(token), nombre: datos.cliente || '', desde: ahora, ultimoUso: ahora };
   d.clienteDatos = datos;
   d.bienvenidaVista = true;
   if (!d.contacto?.nombre && datos.cliente) d.contacto = { ...(d.contacto || {}), nombre: datos.cliente };
@@ -112,6 +126,7 @@ export async function refrescarCliente() {
     // Instalaciones anteriores (guardaban el enlace): se cambia por la clave del móvil la primera vez
     if (!c.clave && c.token && !DEMO) {
       c.clave = await vincularMovil(c.token);
+      c.enlace = await huellaEnlace(c.token);
       delete c.token;
       await persistir();
     }

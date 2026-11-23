@@ -231,3 +231,9 @@ Base: `reyman-diag-v0.1.zip` (el código de la v0.2 con el Wi-Fi no estaba dispo
 ### Ya pendiente de la v0.2
 9. Crear el repositorio en GitHub, DNS `diag`, proxy HTTPS e instalación en el VPS (ver `README.md`).
 10. Integración con App Reyman (`docs/INTEGRACION.md`) y manuales por rol.
+
+### 29. Reyman Connect 0.8.1: no vuelve a pedir el enlace y sin zoom con doble toque (23/11/2026)
+- Desde la 0.7.0 la app no guardaba el enlace, así que cada vez que se abría desde el enlace de WhatsApp pedía añadir la ficha otra vez (el iPhone de prueba se vinculó 3 veces en 5 min). Ahora guarda solo la huella SHA-256 del enlace (`cliente.enlace`, `huellaEnlace` en `cliente.js`): el mismo enlace se ignora; un enlace nuevo de la misma persona solo actualiza la huella («Tu ficha ya está en esta app»); uno caducado o no válido, con la ficha ya guardada, no molesta. Las instalaciones de la 0.7/0.8 cogen la huella sola la primera vez.
+- Sin zoom con doble toque ni pellizco (`touch-action: manipulation` y `user-scalable=no`).
+- El móvil se registra como «Reyman Connect (iPhone)» (el «·» lo quitaba el servidor).
+- **141 pruebas automáticas.**
