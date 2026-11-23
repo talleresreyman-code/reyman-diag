@@ -6,12 +6,16 @@
 name: Reyman Connect · iOS
 on:
   workflow_dispatch:
+    inputs:
+      mac:
+        description: 'Mac de GitHub (macos-latest = Apple Silicon; si está saturado, macos-15-intel)'
+        default: macos-latest
   push:
     branches: [main]
     paths: ['apps/cliente/**', 'packages/obd-core/**', '.github/workflows/connect-ios.yml']
 jobs:
   ios:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.mac || 'macos-latest' }}
     timeout-minutes: 45
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
